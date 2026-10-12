@@ -24,9 +24,21 @@ const script = [
 	// "I hope you're doing well"
 ];
 
+function caret(x, y) {
+	context.save();
+
+	const caretHeight = 62.5;
+	const caretWidth = 3;
+
+	context.fillStyle = `rgba(0, 0, 0, ${unipolarSineWave(4 * elapsedTime)})`;
+	context.fillRect(x, y - caretHeight / 2, caretWidth, caretHeight);
+
+	context.restore();
+}
+
 let currentMessageIndex = 0;
 let characterShown = 0;
-let typingSpeed = 10;
+let typingSpeed = 1;
 let typingTimer = 0;
 
 function showMessage() {
@@ -34,7 +46,12 @@ function showMessage() {
 	const visibleText = messsage.substring(0, characterShown);
 
 	context.fillText(visibleText, width / 2, height / 2);
-	// caret();
+
+	const metrics = context.measureText(visibleText);
+	const textEndX = width / 2 + metrics.width / 2;
+
+	caret(textEndX, height / 2);
+
 }
 
 function resizeCanvas() {
@@ -51,8 +68,6 @@ function resizeCanvas() {
 
 function init() {
 	resizeCanvas();
-
-	// Setting up the font
 }
 
 function update(deltaTime) {
@@ -72,14 +87,6 @@ function update(deltaTime) {
 	}
 }
 
-function caret() {
-	context.save();
-
-	context.fillStyle = `rgba(0, 0, 0, ${unipolarSineWave(4 * elapsedTime)})`;
-	context.fillRect(width / 2, height / 2, 10, 20);
-
-	context.restore();
-}
 
 function draw() {
 	// Clear the entire rectangle
