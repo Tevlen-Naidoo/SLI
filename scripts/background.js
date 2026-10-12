@@ -1,8 +1,23 @@
+import { unipolarSineWave } from "./utilities.js";
+
 const canvas = document.getElementById('background');
 const context = canvas.getContext('2d');
 
 let width = 0;
 let height = 0;
+
+let elapsedTime = 0;
+
+const textStyle = {
+	font: "50pt 'Yuyu'",
+	fillStyle: "#000000",
+	textAlign: "center",
+	textBaseline: "middle"
+};
+
+document.fonts.ready.then(() => {
+	textStyle.font = "50pt 'Yuyu'";
+})
 
 const script = [
 	"Hello, World",
@@ -13,10 +28,7 @@ function showMessage() {
 	context.fillStyle = "black"
 
 	script.forEach((message) => {
-		let metrics = context.measureText(message);
-		let messageHeight = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
-
-		context.fillText(message, (width - metrics.width) / 2, (height - messageHeight) / 2);
+		context.fillText(message, width / 2, height / 2);
 	})
 }
 
@@ -36,23 +48,25 @@ function init() {
 	resizeCanvas();
 
 	// Setting up the font
-	document.fonts.ready.then(() => {
-		context.font = "50pt 'Yuyu', sans-seriff";
-	})
 }
 
 function update(deltaTime) {
-	// TODO
+	elapsedTime += deltaTime;
 }
 
 function draw() {
 	// Clear the entire rectangle
 	context.clearRect(0, 0, width, height);
 
-	// TODO
+	context.font = textStyle.font;
+	context.fillStyle = textStyle.fillStyle;
+	context.textAlign = textStyle.textAlign;
+	context.textBaseline = textStyle.textBaseline;
 
-	// context.fillText("Hello World", 50, 100);
-	showMessage();
+	// showMessage();
+
+	context.fillStyle = `rgba(0, 0, 0, ${unipolarSineWave(elapsedTime)})`;
+	context.fillRect(200, 10, width / 2, height / 2);
 }
 
 // Main animation loop
@@ -62,7 +76,7 @@ function animate(timestamp) {
 	// Delta time in seconds; clamp large jumps after tab inactivity
 	const deltaTime = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.05) : 0;
 
-	lastTime = deltaTime;
+	lastTime = timestamp;
 
 	update(deltaTime);
 	draw();
