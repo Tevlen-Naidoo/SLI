@@ -24,12 +24,17 @@ const script = [
 	// "I hope you're doing well"
 ];
 
-function showMessage() {
-	context.fillStyle = "black"
+let currentMessageIndex = 0;
+let characterShown = 0;
+let typingSpeed = 10;
+let typingTimer = 0;
 
-	script.forEach((message) => {
-		context.fillText(message, width / 2, height / 2);
-	})
+function showMessage() {
+	const messsage = script[currentMessageIndex];
+	const visibleText = messsage.substring(0, characterShown);
+
+	context.fillText(visibleText, width / 2, height / 2);
+	// caret();
 }
 
 function resizeCanvas() {
@@ -52,6 +57,19 @@ function init() {
 
 function update(deltaTime) {
 	elapsedTime += deltaTime;
+
+	typingTimer += deltaTime * typingSpeed;
+
+	while (typingTimer >= 1) {
+		characterShown++;
+		typingTimer--;
+	}
+
+	const message = script[currentMessageIndex];
+
+	if (characterShown >= message.length) {
+		characterShown = message.length;
+	}
 }
 
 function caret() {
@@ -72,9 +90,8 @@ function draw() {
 	context.textAlign = textStyle.textAlign;
 	context.textBaseline = textStyle.textBaseline;
 
-	// showMessage();
+	showMessage();
 
-	caret();
 }
 
 // Main animation loop
