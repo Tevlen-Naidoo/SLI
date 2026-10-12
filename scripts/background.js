@@ -54,6 +54,15 @@ function update(deltaTime) {
 	elapsedTime += deltaTime;
 }
 
+function caret() {
+	context.save();
+
+	context.fillStyle = `rgba(0, 0, 0, ${unipolarSineWave(4 * elapsedTime)})`;
+	context.fillRect(width / 2, height / 2, 10, 20);
+
+	context.restore();
+}
+
 function draw() {
 	// Clear the entire rectangle
 	context.clearRect(0, 0, width, height);
@@ -65,8 +74,7 @@ function draw() {
 
 	// showMessage();
 
-	context.fillStyle = `rgba(0, 0, 0, ${unipolarSineWave(elapsedTime)})`;
-	context.fillRect(200, 10, width / 2, height / 2);
+	caret();
 }
 
 // Main animation loop
