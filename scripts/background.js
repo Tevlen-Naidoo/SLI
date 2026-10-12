@@ -4,6 +4,22 @@ const context = canvas.getContext('2d');
 let width = 0;
 let height = 0;
 
+const script = [
+	"Hello, World",
+	// "I hope you're doing well"
+];
+
+function showMessage() {
+	context.fillStyle = "black"
+
+	script.forEach((message) => {
+		let metrics = context.measureText(message);
+		let messageHeight = metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent;
+
+		context.fillText(message, (width - metrics.width) / 2, (height - messageHeight) / 2);
+	})
+}
+
 function resizeCanvas() {
 	const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -19,7 +35,10 @@ function resizeCanvas() {
 function init() {
 	resizeCanvas();
 
-	// TODO
+	// Setting up the font
+	document.fonts.ready.then(() => {
+		context.font = "50pt 'Yuyu', sans-seriff";
+	})
 }
 
 function update(deltaTime) {
@@ -31,6 +50,9 @@ function draw() {
 	context.clearRect(0, 0, width, height);
 
 	// TODO
+
+	// context.fillText("Hello World", 50, 100);
+	showMessage();
 }
 
 // Main animation loop
@@ -49,6 +71,7 @@ function animate(timestamp) {
 }
 
 
-resizeCanvas();
-
 window.addEventListener('resize', resizeCanvas);
+
+init();
+requestAnimationFrame(animate);
