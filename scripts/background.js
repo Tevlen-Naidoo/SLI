@@ -21,7 +21,7 @@ document.fonts.ready.then(() => {
 
 const script = [
 	"Hello, World",
-	// "I hope you're doing well"
+	"I hope you're doing well"
 ];
 
 function caret(x, y) {
@@ -38,20 +38,29 @@ function caret(x, y) {
 
 let currentMessageIndex = 0;
 let characterShown = 0;
-let typingSpeed = 1;
+
+let typingSpeed = 10;
+let backspaceSpeed = 10;
+let displayDuration = 2;
+
+let phase = "typing";
+let characterTimer = 0;
+let pauseTimer = 0;
+
 let typingTimer = 0;
+let displayPause = 0;
+let fullyDisplayed = false;
 
 function showMessage() {
-	const messsage = script[currentMessageIndex];
-	const visibleText = messsage.substring(0, characterShown);
+	const message = script[currentMessageIndex];
+	const visibleText = message.substring(0, characterShown);
 
 	context.fillText(visibleText, width / 2, height / 2);
 
 	const metrics = context.measureText(visibleText);
 	const textEndX = width / 2 + metrics.width / 2;
 
-	caret(textEndX, height / 2);
-
+	caret(textEndX + 10, height / 2);
 }
 
 function resizeCanvas() {
@@ -73,18 +82,93 @@ function init() {
 function update(deltaTime) {
 	elapsedTime += deltaTime;
 
-	typingTimer += deltaTime * typingSpeed;
-
-	while (typingTimer >= 1) {
-		characterShown++;
-		typingTimer--;
-	}
+	// typingTimer += deltaTime * typingSpeed;
+	//
+	// while (typingTimer >= 1) {
+	// 	characterShown++;
+	// 	typingTimer--;
+	// }
 
 	const message = script[currentMessageIndex];
 
-	if (characterShown >= message.length) {
-		characterShown = message.length;
+	switch (phase) {
+		case "typing": {
+			characterTimer += deltaTime * typingSpeed;
+
+			while (characterTimer >= 1) {
+				characterShown++;
+				characterTimer--;
+
+			}
+
+			if (characterShown >= message.length) {
+				characterShown = message.length;
+				phase = "pause";
+				pauseTimer = 0;
+				characterTimer = 0;
+			}
+
+			break;
+
+		}
+
+		case "pause": {
+			pauseTimer += deltaTime;
+
+			if (pauseTimer >= displayDuration) {
+				if (currentMessageIndex == script.length - 1) {
+					phase = "done";
+
+				}
+				else {
+					phase = "deleting";
+					characterTimer = 0;
+				}
+			}
+
+			break;
+		}
+
+		case "deleting": {
+			characterTimer += deltaTime * backspaceSpeed;
+
+			while (characterTimer >= 1) {
+				characterShown--;
+				characterTimer--;
+			}
+
+			if (characterShown <= 0) {
+				characterShown = 0;
+				currentMessageIndex++;
+				phase = "typing";
+				characterTimer = 0;
+			}
+
+			break;
+		}
+
+		case "done": {
+			break;
+		}
 	}
+
+	// // Message is growing
+	// if (characterShown >= message.length) {
+	// 	characterShown = message.length;
+	// 	fullyDisplayed = true;
+	// }
+	//
+	// if (fullyDisplayed && displayPause <= 10) {
+	// 	displayPause++;
+	// }
+	//
+	// if (displayPause >= 10) {
+	// 	characterShown--;
+	// 	fullyDisplayed = false;
+	//
+	// }
+	//
+
 }
 
 
