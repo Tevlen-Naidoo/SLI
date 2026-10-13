@@ -1,56 +1,120 @@
-const canvas = document.getElementById('background');
-const context = canvas.getContext('2d');
+import { Stage, DrawPath, Timeline } from './framework.js';
+import { degrees2radians, polar2cartesian } from './utilities.js';
 
-let width = 0;
-let height = 0;
-let dpr = 1;
+const DEBUG = false; // true = show the design area outline
 
-let elapsedTime = 0;
+const stage = new Stage(document.getElementById('background'), {
+	designWidth: 1600,
+	designHeight: 900,
+});
 
-function resizeCanvas() {
-	dpr = Math.min(window.devicePixelRatio || 1, 2);
+let timeline = null;
 
-	width = window.innerWidth;
-	height = window.innerHeight;
+function rays(count, inner, outer, offsetDeg = 0) {
+	const path = new DrawPath();
+	const step = 360 / count;
 
-	canvas.width = Math.round(width * dpr);
-	canvas.height = Math.round(height * dpr);
+	for (let i = 0; i < count; i++) {
+		const angle = degrees2radians(offsetDeg + step * i);
+		const a = polar2cartesian(inner, angle);
+		const b = polar2cartesian(outer, angle);
+		path.moveTo(a.x, a.y).lineTo(b.x, b.y);
+	}
 
-	context.setTransform(dpr, 0, 0, dpr, 0, 0);
+	return path;
 }
 
-function init() {
-	resizeCanvas();
+function sun(tl, { x = 0, y = 0, ...timing } = {}) {
+
+	let longLen = 150;
+	let shortLen = 75;
+
+	tl.layer({ x, y, ...timing }, s => {
+		s.add(new DrawPath().circle(0, 0, 100), {
+			color: '#e0962f', lineWidth: 3, fill: 'rgba(224, 150, 47, 0.25)', duration: 1,
+		});
+
+		// for (let i = 0; i < 4; i++) {
+		// 	s.add(rays(12, 120, 270), {
+		// 		color: '#d4602a', lineWidth: 4, duration: 0.8,
+		// 	});
+		// }
+
+
+		s.add(rays(12, 120, 270), {
+			color: '#d4602a', lineWidth: 4, duration: 0.8,
+		});
+
+
+
+
+
+		s.add(rays(12, 120, 200, 15), {
+			color: '#f2c14e', lineWidth: 3, duration: 0.8, at: 'with', delay: 0.2,
+		});
+
+	});
 }
 
-function update(deltaTime) {
-	elapsedTime += deltaTime;
+// function sun() {
+// 	const path = new DrawPath();
+//
+// 	// The actual sun
+// 	path.circle(0, 0, 100);
+//
+// 	for (let i = 0; i < 12; i++) {
+// 		let angle = degrees2radians(30 * i);
+// 		const inner = polar2cartesian(120, angle);
+// 		const outer = polar2cartesian(200, angle);
+// 		path.moveTo(inner.x, inner.y).lineTo(outer.x, outer.y);
+// 	}
+//
+// 	for (let i = 1; i < 12; i++) {
+// 		let angle = degrees2radians(60 * i);
+// 		const inner = polar2cartesian(120, angle);
+// 		const outer = polar2cartesian(250, angle);
+// 		path.moveTo(inner.x, inner.y).lineTo(outer.x, outer.y);
+// 	}
+//
+// 	return path;
+// }
+
+/* ==========================================================================
+   Scene
+   (0, 0) is the screen centre. The 1600 x 900 design area (x -800..800,
+   y -450..450) is always visible. halfW / halfH are the visible edges,
+   slightly larger on screens that aren't exactly 16:9.
+   ========================================================================== */
+
+function buildScene({ halfW }) {
+	const tl = new Timeline();
+	// const edge = halfW + 20; // run slightly past the edge so line caps aren't visible
+
+	// tl.add(sun(), {
+	// 	color: "#e0962f",
+	// 	lineWidth: 3,
+	// 	fill: "rgba(224, 150, 47, 0.25)",
+	// 	duration: 0
+	// });
+
+	sun(tl, { x: 0, y: 0 });
+
+	return tl;
 }
 
 
-function draw() {
-	// Clear the entire rectangle
-	context.clearRect(0, 0, width, height);
-}
+/* ==========================================================================
+   Run
+   ========================================================================== */
 
+stage.onResize = s => { timeline = buildScene(s); };
+stage.onResize(stage);
 
-// Main animation loop
-let lastTime = 0;
+stage.canvas.addEventListener('click', () => stage.restart());
 
-function animate(timestamp) {
-	// Delta time in seconds; clamp large jumps after tab inactivity
-	const deltaTime = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.05) : 0;
-
-	lastTime = timestamp;
-
-	update(deltaTime);
-	draw();
-
-	requestAnimationFrame(animate);
-}
-
-
-window.addEventListener('resize', resizeCanvas);
-
-init();
-requestAnimationFrame(animate);
+stage.start({
+	draw(ctx, time) {
+		timeline.draw(ctx, time);
+		if (DEBUG) stage.drawDesignArea();
+	},
+});

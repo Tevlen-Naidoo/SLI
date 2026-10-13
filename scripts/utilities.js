@@ -93,3 +93,19 @@ export function noise2D(x, y, seed = 0) {
 
 	return top + (bottom - top) * sy;
 }
+
+export function degrees2radians(degrees) {
+	return degrees * (Math.PI / 180);
+}
+
+export function radians2degrees(radians) {
+	return radians * (180 / Math.PI);
+}
+
+export function cartesian2polar(x, y) {
+	return { radius: Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)), angle: Math.atan(y / x) };
+}
+
+export function polar2cartesian(r, theta) {
+	return { x: r * Math.cos(theta), y: r * Math.sin(theta) };
+}
