@@ -41,15 +41,14 @@ let characterShown = 0;
 
 let typingSpeed = 10;
 let backspaceSpeed = 10;
+
 let displayDuration = 2;
+let transitionDuration = 0.5;
 
 let phase = "typing";
 let characterTimer = 0;
 let pauseTimer = 0;
 
-let typingTimer = 0;
-let displayPause = 0;
-let fullyDisplayed = false;
 
 function showMessage() {
 	const message = script[currentMessageIndex];
@@ -81,13 +80,6 @@ function init() {
 
 function update(deltaTime) {
 	elapsedTime += deltaTime;
-
-	// typingTimer += deltaTime * typingSpeed;
-	//
-	// while (typingTimer >= 1) {
-	// 	characterShown++;
-	// 	typingTimer--;
-	// }
 
 	const message = script[currentMessageIndex];
 
@@ -139,12 +131,22 @@ function update(deltaTime) {
 
 			if (characterShown <= 0) {
 				characterShown = 0;
-				currentMessageIndex++;
-				phase = "typing";
-				characterTimer = 0;
+				phase = "transition";
+				pauseTimer = 0;
 			}
 
 			break;
+		}
+
+		case "transition": {
+			pauseTimer += deltaTime;
+
+			if (pauseTimer >= transitionDuration) {
+				currentMessageIndex++;
+				phase = "typing";
+				characterTimer = 0;
+				pauseTimer = 0;
+			}
 		}
 
 		case "done": {
@@ -152,22 +154,6 @@ function update(deltaTime) {
 		}
 	}
 
-	// // Message is growing
-	// if (characterShown >= message.length) {
-	// 	characterShown = message.length;
-	// 	fullyDisplayed = true;
-	// }
-	//
-	// if (fullyDisplayed && displayPause <= 10) {
-	// 	displayPause++;
-	// }
-	//
-	// if (displayPause >= 10) {
-	// 	characterShown--;
-	// 	fullyDisplayed = false;
-	//
-	// }
-	//
 
 }
 
