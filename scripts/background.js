@@ -1,10 +1,11 @@
-import { unipolarSineWave } from "./utilities.js";
+import { unipolarSineWave, noise2D } from "./utilities.js";
 
 const canvas = document.getElementById('background');
 const context = canvas.getContext('2d');
 
 let width = 0;
 let height = 0;
+let dpr = 1;
 
 let elapsedTime = 0;
 
@@ -49,21 +50,139 @@ let phase = "typing";
 let characterTimer = 0;
 let pauseTimer = 0;
 
+const wiggle = {
+	frameCount: 4,         // number of distinct wobble patterns to cycle through
+	boilRate: 6,           // pattern changes per second
+	frequency: 0.12,       // noise cells per CSS pixel: higher = smaller, tighter wobbles
+	amplitude: 0.8         // max displacement in CSS pixels
+};
+
+// Off-screen canvases: one holds the crisp text, the other receives the warped result
+const sourceCanvas = document.createElement('canvas');
+const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
+
+const wiggleCanvas = document.createElement('canvas');
+const wiggleContext = wiggleCanvas.getContext('2d');
+
+let wiggleCacheKey = "";
+let wiggleBox = { width: 0, height: 0 };
+
+function parseColor(color) {
+	sourceCanvas.width = sourceCanvas.height = 1;
+	sourceContext.fillStyle = color;
+	sourceContext.fillRect(0, 0, 1, 1);
+
+	const [r, g, b] = sourceContext.getImageData(0, 0, 1, 1).data;
+	return { r, g, b };
+}
+
+function sampleAlpha(data, w, h, x, y) {
+	if (x < 0 || y < 0 || x > w - 1 || y > h - 1) return 0;
+
+	const x0 = Math.floor(x);
+	const y0 = Math.floor(y);
+	const x1 = Math.min(x0 + 1, w - 1);
+	const y1 = Math.min(y0 + 1, h - 1);
+
+	const tx = x - x0;
+	const ty = y - y0;
+
+	const a = data[(y0 * w + x0) * 4 + 3];
+	const b = data[(y0 * w + x1) * 4 + 3];
+	const c = data[(y1 * w + x0) * 4 + 3];
+	const d = data[(y1 * w + x1) * 4 + 3];
+
+	const top = a + (b - a) * tx;
+	const bottom = c + (d - c) * tx;
+
+	return top + (bottom - top) * ty;
+}
+
+function renderWiggleText(message, seed) {
+	const metrics = context.measureText(message);
+
+	// Half-extents around the centre point, since the text is centre/middle aligned
+	const padding = Math.ceil(wiggle.amplitude * 2);
+	const halfWidth = Math.ceil(Math.max(metrics.actualBoundingBoxLeft, metrics.actualBoundingBoxRight, metrics.width / 2)) + padding;
+	const halfHeight = Math.ceil(Math.max(metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent)) + padding;
+
+	const cssWidth = halfWidth * 2;
+	const cssHeight = halfHeight * 2;
+
+	const w = Math.ceil(cssWidth * dpr);
+	const h = Math.ceil(cssHeight * dpr);
+
+	const color = parseColor(textStyle.fillStyle);
+
+	sourceCanvas.width = wiggleCanvas.width = w;
+	sourceCanvas.height = wiggleCanvas.height = h;
+
+	sourceContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+	sourceContext.font = textStyle.font;
+	sourceContext.fillStyle = textStyle.fillStyle;
+	sourceContext.textAlign = "center";
+	sourceContext.textBaseline = "middle";
+	sourceContext.fillText(message, halfWidth, halfHeight);
+
+	const src = sourceContext.getImageData(0, 0, w, h).data;
+	const output = wiggleContext.createImageData(w, h);
+	const dst = output.data;
+
+	const frequency = wiggle.frequency / dpr;
+	const amplitude = wiggle.amplitude * dpr;
+
+	for (let y = 0; y < h; y++) {
+		const ny = y * frequency;
+
+		for (let x = 0; x < w; x++) {
+			const nx = x * frequency;
+
+			const dx = noise2D(nx, ny, seed) * amplitude;
+			const dy = noise2D(nx, ny, seed + 101) * amplitude;
+
+			const alpha = sampleAlpha(src, w, h, x + dx, y + dy);
+			if (alpha === 0) continue;
+
+			const index = (y * w + x) * 4;
+			dst[index] = color.r;
+			dst[index + 1] = color.g;
+			dst[index + 2] = color.b;
+			dst[index + 3] = alpha;
+		}
+	}
+
+	wiggleContext.putImageData(output, 0, 0);
+	wiggleBox = { width: cssWidth, height: cssHeight };
+}
+
+function drawWiggleText(message, x, y) {
+	if (!message) return;
+
+	const seed = Math.floor(elapsedTime * wiggle.boilRate) % wiggle.frameCount;
+	const key = `${message}|${seed}|${dpr}|${textStyle.font}`;
+
+	if (key !== wiggleCacheKey) {
+		wiggleCacheKey = key;
+		renderWiggleText(message, seed);
+	}
+
+	context.drawImage(wiggleCanvas, x - wiggleBox.width / 2, y - wiggleBox.height / 2, wiggleBox.width, wiggleBox.height);
+}
 
 function showMessage() {
 	const message = script[currentMessageIndex];
 	const visibleText = message.substring(0, characterShown);
 
-	context.fillText(visibleText, width / 2, height / 2);
+	const totalWidth = context.measureText(visibleText).width;
 
-	const metrics = context.measureText(visibleText);
-	const textEndX = width / 2 + metrics.width / 2;
+	drawWiggleText(visibleText, width / 2, height / 2);
 
-	caret(textEndX + 10, height / 2);
+	caret(width / 2 + totalWidth / 2 + 10, height / 2);
 }
 
+
 function resizeCanvas() {
-	const dpr = Math.min(window.devicePixelRatio || 1, 2);
+	dpr = Math.min(window.devicePixelRatio || 1, 2);
 
 	width = window.innerWidth;
 	height = window.innerHeight;
