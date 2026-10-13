@@ -53,8 +53,9 @@ let pauseTimer = 0;
 const wiggle = {
 	frameCount: 4,         // number of distinct wobble patterns to cycle through
 	boilRate: 6,           // pattern changes per second
-	frequency: 0.12,       // noise cells per CSS pixel: higher = smaller, tighter wobbles
-	amplitude: 0.8         // max displacement in CSS pixels
+	frequency: 0.15,       // noise cells per CSS pixel: higher = smaller, tighter wobbles
+	amplitude: 0.6,        // max displacement in CSS pixels
+	supersample: 3         // sub-samples per pixel along each axis: higher = smoother edges, slower
 };
 
 // Off-screen canvases: one holds the crisp text, the other receives the warped result
@@ -101,7 +102,6 @@ function sampleAlpha(data, w, h, x, y) {
 function renderWiggleText(message, seed) {
 	const metrics = context.measureText(message);
 
-	// Half-extents around the centre point, since the text is centre/middle aligned
 	const padding = Math.ceil(wiggle.amplitude * 2);
 	const halfWidth = Math.ceil(Math.max(metrics.actualBoundingBoxLeft, metrics.actualBoundingBoxRight, metrics.width / 2)) + padding;
 	const halfHeight = Math.ceil(Math.max(metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent)) + padding;
@@ -112,24 +112,31 @@ function renderWiggleText(message, seed) {
 	const w = Math.ceil(cssWidth * dpr);
 	const h = Math.ceil(cssHeight * dpr);
 
+	const ss = wiggle.supersample;
+	const sw = w * ss;
+	const sh = h * ss;
+
 	const color = parseColor(textStyle.fillStyle);
 
-	sourceCanvas.width = wiggleCanvas.width = w;
-	sourceCanvas.height = wiggleCanvas.height = h;
+	sourceCanvas.width = sw;
+	sourceCanvas.height = sh;
+	wiggleCanvas.width = w;
+	wiggleCanvas.height = h;
 
-	sourceContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+	sourceContext.setTransform(dpr * ss, 0, 0, dpr * ss, 0, 0);
 	sourceContext.font = textStyle.font;
 	sourceContext.fillStyle = textStyle.fillStyle;
 	sourceContext.textAlign = "center";
 	sourceContext.textBaseline = "middle";
 	sourceContext.fillText(message, halfWidth, halfHeight);
 
-	const src = sourceContext.getImageData(0, 0, w, h).data;
+	const src = sourceContext.getImageData(0, 0, sw, sh).data;
 	const output = wiggleContext.createImageData(w, h);
 	const dst = output.data;
 
 	const frequency = wiggle.frequency / dpr;
 	const amplitude = wiggle.amplitude * dpr;
+	const sampleCount = ss * ss;
 
 	for (let y = 0; y < h; y++) {
 		const ny = y * frequency;
@@ -140,7 +147,29 @@ function renderWiggleText(message, seed) {
 			const dx = noise2D(nx, ny, seed) * amplitude;
 			const dy = noise2D(nx, ny, seed + 101) * amplitude;
 
-			const alpha = sampleAlpha(src, w, h, x + dx, y + dy);
+			const baseX = (x + dx) * ss;
+			const baseY = (y + dy) * ss;
+
+			const last = ss - 1;
+			const c0 = sampleAlpha(src, sw, sh, baseX, baseY);
+			const c1 = sampleAlpha(src, sw, sh, baseX + last, baseY);
+			const c2 = sampleAlpha(src, sw, sh, baseX, baseY + last);
+			const c3 = sampleAlpha(src, sw, sh, baseX + last, baseY + last);
+
+			let alpha;
+			if (c0 === c1 && c0 === c2 && c0 === c3 && (c0 === 0 || c0 === 255)) {
+				alpha = c0;
+			}
+			else {
+				let sum = 0;
+				for (let j = 0; j < ss; j++) {
+					for (let i = 0; i < ss; i++) {
+						sum += sampleAlpha(src, sw, sh, baseX + i, baseY + j);
+					}
+				}
+				alpha = sum / sampleCount;
+			}
+
 			if (alpha === 0) continue;
 
 			const index = (y * w + x) * 4;
