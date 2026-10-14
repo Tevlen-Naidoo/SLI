@@ -398,6 +398,24 @@ export class DrawPath {
 		return this.lineTo(this._startX, this._startY);
 	}
 
+	// Position `t` (0..1) of the way along the path, by length
+	pointAt(t) {
+		const pts = this.points;
+		if (!pts.length) return { x: 0, y: 0 };
+
+		const target = this.length * clamp01(t);
+		for (let i = 1; i < pts.length; i++) {
+			const p = pts[i];
+			if (p.d >= target && !p.move) {
+				const prev = pts[i - 1];
+				const k = p.d > prev.d ? (target - prev.d) / (p.d - prev.d) : 0;
+				return { x: prev.x + (p.x - prev.x) * k, y: prev.y + (p.y - prev.y) * k };
+			}
+		}
+		const last = pts[pts.length - 1];
+		return { x: last.x, y: last.y };
+	}
+
 	// Builds the first `t` (0..1) of the path on ctx. Returns the pen tip position.
 	trace(ctx, t) {
 		const pts = this.points;

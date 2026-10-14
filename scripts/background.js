@@ -1,5 +1,5 @@
 import { Stage, Timeline } from './framework.js';
-import { sun, hill1, betterHill1, hill2, hill3, mountain } from './objects.js';
+import { sun, hill1, betterHill1, hill2, hill3, mountain, flower1, flower2 } from './objects.js';
 
 const DEBUG = true; // true = show the coordinate grid and design area outline
 
@@ -23,13 +23,16 @@ function buildScene({ halfW }) {
 
 
 	// sun(tl, { x: 0, y: 0 });
-	hill1(tl, { x: -edge + 200, y: 500 });
-	betterHill1(tl, edge, { x: 0, y: 0 });
+	// hill1(tl, { x: -edge + 200, y: 500 });
+	// betterHill1(tl, edge, { x: 0, y: 0 });
 	// hill2(tl, { x: edge - 300, y: 500 });
 	// hill3(tl, { x: edge - 500, y: 500 });
 
 
 	// mountain(tl, edge, { x: 0, y: 0 });
+
+	// flower1(tl, { x: 0, y: 400 });
+	flower2(tl, { x: 0, y: 400 }); // (x, y) = stalk base; add scale: 0.3 etc. to shrink
 
 	return tl;
 }

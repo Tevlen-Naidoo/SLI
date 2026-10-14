@@ -137,3 +137,132 @@ export function mountain(tl, edge, { x = 0, y = 0, ...timing } = {}) {
 	});
 
 }
+
+// Adds one pointed petal/leaf outline to `path`, starting `inner` from (x, y) along `angle` (radians)
+function petalShape(path, x, y, angle, inner, outer, width) {
+	const cos = Math.cos(angle), sin = Math.sin(angle);
+	const len = outer - inner;
+	const half = width / 2;
+
+	// Designed pointing along +x (u = along, v = across), then rotated into place
+	const p = (u, v) => [x + u * cos - v * sin, y + u * sin + v * cos];
+
+	path.moveTo(...p(inner, 0));
+	path.cubicTo(...p(inner + len * 0.25, -half * 1.3), ...p(outer - len * 0.2, -half * 0.9), ...p(outer, 0));
+	path.cubicTo(...p(outer - len * 0.2, half * 0.9), ...p(inner + len * 0.25, half * 1.3), ...p(inner, 0));
+	return path;
+}
+
+/**
+ * Ring of pointed petals around (0, 0), one closed shape per petal.
+ * Each petal runs from radius `inner` out to its tip at `outer`, `width` across at its widest.
+ * Each petal starts with moveTo, so they aren't joined by connecting lines.
+ */
+export function petals(count, inner, outer, width, offsetDeg = 0) {
+	const path = new DrawPath();
+	const step = 360 / count;
+
+	for (let i = 0; i < count; i++) {
+		petalShape(path, 0, 0, degrees2radians(offsetDeg + step * i), inner, outer, width);
+	}
+
+	return path;
+}
+
+/**
+ * Leaf growing from (x, y) towards `angleDeg` (0 = right, -90 = up), with a midrib.
+ */
+export function leaf(x, y, length, width, angleDeg) {
+	const angle = degrees2radians(angleDeg);
+	const path = petalShape(new DrawPath(), x, y, angle, 0, length, width);
+	const tip = polar2cartesian(length * 0.8, angle);
+	return path.moveTo(x, y).lineTo(x + tip.x, y + tip.y);
+}
+
+// Flowers are drawn with the head at (0, 0) and the stalk base this far below it
+const STALK_HEIGHT = 400;
+
+// Two leaves on a stalk: `a` and `b` are { at: 0..1 along the stalk, angle, length, width }
+function stalkLeaves(s, stalk, a, b, duration, scale = 1) {
+	const style = { color: '#2f6b2a', lineWidth: 3 / scale, fill: 'rgba(92, 160, 72, 0.5)', duration };
+
+	for (const [i, l] of [a, b].entries()) {
+		const base = stalk.pointAt(l.at);
+		s.add(leaf(base.x, base.y, l.length, l.width, l.angle), i === 0 ? style : { ...style, at: 'with', delay: duration * 0.4 });
+	}
+}
+
+export function flower1(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
+
+	// (x, y) is the base of the stalk; scale keeps outlines the same width as the rest of the scene
+	tl.layer({ x, y: y - STALK_HEIGHT * scale, scale, ...timing }, s => {
+
+		// stalk, from the ground up to the head at (0, 0)
+		const stalk = new DrawPath().moveTo(0, STALK_HEIGHT).cubicTo(-100, 300, 100, 100, 0, 0);
+		s.add(stalk, {
+			color: '#4a8a3a', lineWidth: 4 / scale, duration: 1,
+		});
+
+		// leaves, drawn before the head so the petals sit over them
+		stalkLeaves(s, stalk,
+			{ at: 0.3, angle: -150, length: 110, width: 45 },
+			{ at: 0.5, angle: -35, length: 90, width: 38 },
+			0.6, scale);
+
+		// head: its own layer, so petals and centre are drawn around (0, 0)
+		s.layer({ x: 0, y: 0 }, h => {
+
+			// back ring, then a front ring offset by half a petal
+			h.add(petals(12, 40, 150, 50), {
+				color: '#c2416b', lineWidth: 3 / scale, fill: 'rgba(236, 120, 160, 0.35)', duration: 1.5,
+			});
+
+			h.add(petals(12, 35, 110, 40, 15), {
+				color: '#d4602a', lineWidth: 3 / scale, fill: 'rgba(242, 193, 78, 0.4)', duration: 1.2, at: 'with', delay: 0.4,
+			});
+
+			// centre on top, covering the petal bases
+			h.add(new DrawPath().circle(0, 0, 50), {
+				color: '#e0962f', lineWidth: 3 / scale, fill: 'rgba(224, 150, 47, 0.9)', duration: 0.6,
+			});
+		});
+
+	});
+
+}
+
+export function flower2(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
+
+	// (x, y) is the base of the stalk; scale keeps outlines the same width as the rest of the scene
+	tl.layer({ x, y: y - STALK_HEIGHT * scale, scale, ...timing }, s => {
+
+		// stalk, from the ground up to the head at (0, 0)
+		const stalk = new DrawPath().moveTo(0, STALK_HEIGHT).cubicTo(100, 300, -100, 100, 0, 0);
+		s.add(stalk, {
+			color: '#4a8a3a', lineWidth: 4 / scale, duration: 0,
+		});
+
+		// leaves, kept low so the big petals don't cover them
+		stalkLeaves(s, stalk,
+			{ at: 0.15, angle: -30, length: 110, width: 45 },
+			{ at: 0.35, angle: -150, length: 100, width: 40 },
+			0, scale);
+
+		// head: its own layer, so petals and centre are drawn around (0, 0)
+		s.layer({ x: 0, y: 0 }, h => {
+
+			// back ring, then a front ring offset by half a petal
+			h.add(petals(5, 30, 200, 150), {
+				color: '#c2416b', lineWidth: 3 / scale, fill: 'rgba(236, 120, 160, 0.35)', duration: 0,
+			});
+
+			// centre on top, covering the petal bases
+			h.add(new DrawPath().circle(0, 0, 70), {
+				color: '#e0962f', lineWidth: 3 / scale, fill: 'rgba(224, 150, 47, 0.9)', duration: 0,
+			});
+		});
+
+	});
+
+}
+
