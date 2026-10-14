@@ -34,23 +34,41 @@ function sun(tl, { x = 0, y = 0, ...timing } = {}) {
 			color: '#e0962f', lineWidth: 3, fill: 'rgba(224, 150, 47, 0.25)', duration: 1,
 		});
 
-		// for (let i = 0; i < 4; i++) {
-		// 	s.add(rays(12, 120, 270), {
-		// 		color: '#d4602a', lineWidth: 4, duration: 0.8,
-		// 	});
-		// }
 
+		// Long rays
 
-		s.add(rays(12, 120, 270), {
+		s.add(rays(12, 120, 120 + longLen), {
+			color: '#d4602a', lineWidth: 4, duration: 0.8,
+		});
+
+		s.add(rays(12, 120 + longLen + 20, 120 + longLen + 20 + longLen), {
 			color: '#d4602a', lineWidth: 4, duration: 0.8,
 		});
 
 
+		// Short Rays
 
-
-
-		s.add(rays(12, 120, 200, 15), {
+		s.add(rays(12, 120, 120 + shortLen, 15), {
 			color: '#f2c14e', lineWidth: 3, duration: 0.8, at: 'with', delay: 0.2,
+		});
+
+		s.add(rays(12, 120 + shortLen + 20, 120 + shortLen + 20 + 20, 15), {
+			color: '#f2c14e', lineWidth: 3, duration: 0.8, at: 'with', delay: 0.2,
+		});
+
+		s.add(rays(12, 120 + shortLen + 20 + 40, 120 + shortLen + 20 + 40 + shortLen, 15), {
+			color: '#f2c14e', lineWidth: 3, duration: 0.8, at: 'with', delay: 0.2,
+		});
+
+
+		// In between
+
+		s.add(rays(12, 120, 120 + shortLen - 40, 20), {
+			color: '#f2c15c', lineWidth: 3, duration: 0.8, at: 'with', delay: 0.2,
+		});
+
+		s.add(rays(12, 120, 120 + shortLen + 40, 40), {
+			color: '#f3615c', lineWidth: 3, duration: 0.8, at: 'with', delay: 0.2,
 		});
 
 	});
