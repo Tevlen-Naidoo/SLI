@@ -5,6 +5,7 @@
    Inside the layer, draw around (0, 0); the layer handles placement.
    ========================================================================== */
 
+import { PISTACHIO } from './colours.js';
 import { DrawPath } from './framework.js';
 import { degrees2radians, polar2cartesian } from './utilities.js';
 
@@ -184,7 +185,7 @@ const STALK_HEIGHT = 400;
 
 // Two leaves on a stalk: `a` and `b` are { at: 0..1 along the stalk, angle, length, width }
 function stalkLeaves(s, stalk, a, b, duration, scale = 1) {
-	const style = { color: '#2f6b2a', lineWidth: 3 / scale, fill: 'rgba(92, 160, 72, 0.5)', duration };
+	const style = { color: PISTACHIO.hex, lineWidth: 3 / scale, fill: PISTACHIO.hex, duration };
 
 	for (const [i, l] of [a, b].entries()) {
 		const base = stalk.pointAt(l.at);
@@ -200,7 +201,7 @@ export function flower1(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
 		// stalk, from the ground up to the head at (0, 0)
 		const stalk = new DrawPath().moveTo(0, STALK_HEIGHT).cubicTo(-100, 300, 100, 100, 0, 0);
 		s.add(stalk, {
-			color: '#4a8a3a', lineWidth: 4 / scale, duration: 1,
+			color: PISTACHIO, lineWidth: 4 / scale, duration: 1,
 		});
 
 		// leaves, drawn before the head so the petals sit over them
@@ -239,7 +240,7 @@ export function flower2(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
 		// stalk, from the ground up to the head at (0, 0)
 		const stalk = new DrawPath().moveTo(0, STALK_HEIGHT).cubicTo(100, 300, -100, 100, 0, 0);
 		s.add(stalk, {
-			color: '#4a8a3a', lineWidth: 4 / scale, duration: 0,
+			color: PISTACHIO, lineWidth: 4 / scale, duration: 0,
 		});
 
 		// leaves, kept low so the big petals don't cover them
