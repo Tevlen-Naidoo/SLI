@@ -1,7 +1,7 @@
 import { Stage, DrawPath, Timeline } from './framework.js';
 import { degrees2radians, polar2cartesian } from './utilities.js';
 
-const DEBUG = false; // true = show the design area outline
+const DEBUG = true; // true = show the coordinate grid and design area outline
 
 const stage = new Stage(document.getElementById('background'), {
 	designWidth: 1600,
@@ -74,28 +74,27 @@ function sun(tl, { x = 0, y = 0, ...timing } = {}) {
 	});
 }
 
-// function sun() {
-// 	const path = new DrawPath();
-//
-// 	// The actual sun
-// 	path.circle(0, 0, 100);
-//
-// 	for (let i = 0; i < 12; i++) {
-// 		let angle = degrees2radians(30 * i);
-// 		const inner = polar2cartesian(120, angle);
-// 		const outer = polar2cartesian(200, angle);
-// 		path.moveTo(inner.x, inner.y).lineTo(outer.x, outer.y);
-// 	}
-//
-// 	for (let i = 1; i < 12; i++) {
-// 		let angle = degrees2radians(60 * i);
-// 		const inner = polar2cartesian(120, angle);
-// 		const outer = polar2cartesian(250, angle);
-// 		path.moveTo(inner.x, inner.y).lineTo(outer.x, outer.y);
-// 	}
-//
-// 	return path;
-// }
+function hill1(tl, { x = 0, y = 0, ...timing } = {}) {
+
+	tl.layer({ x, y, ...timing }, s => {
+
+		s.add(new DrawPath().ellipse(0, 0, 750, 350, degrees2radians(10)), {
+			color: '#e0962f', lineWidth: 3, fill: 'rgba(224, 150, 47, 0.25)', duration: 0, fillDuration: 0
+		});
+	});
+
+}
+
+function hill2(tl, { x = 0, y = 0, ...timing } = {}) {
+
+	tl.layer({ x, y, ...timing }, s => {
+
+		s.add(new DrawPath().ellipse(0, 0, 1100, 350, degrees2radians(-10)), {
+			color: 'lime', lineWidth: 3, fill: 'rgba(0, 255, 0, 0.25)', duration: 0, fillDuration: 0
+		});
+	});
+
+}
 
 /* ==========================================================================
    Scene
@@ -106,16 +105,12 @@ function sun(tl, { x = 0, y = 0, ...timing } = {}) {
 
 function buildScene({ halfW }) {
 	const tl = new Timeline();
-	// const edge = halfW + 20; // run slightly past the edge so line caps aren't visible
+	const edge = halfW + 20; // run slightly past the edge so line caps aren't visible
 
-	// tl.add(sun(), {
-	// 	color: "#e0962f",
-	// 	lineWidth: 3,
-	// 	fill: "rgba(224, 150, 47, 0.25)",
-	// 	duration: 0
-	// });
 
-	sun(tl, { x: 0, y: 0 });
+	// sun(tl, { x: 0, y: 0 });
+	hill1(tl, { x: -edge + 200, y: 500 });
+	hill2(tl, { x: edge - 300, y: 500 });
 
 	return tl;
 }
@@ -132,6 +127,7 @@ stage.canvas.addEventListener('click', () => stage.restart());
 
 stage.start({
 	draw(ctx, time) {
+		if (DEBUG) stage.drawGrid();
 		timeline.draw(ctx, time);
 		if (DEBUG) stage.drawDesignArea();
 	},

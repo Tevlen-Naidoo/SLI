@@ -159,6 +159,68 @@ export class Stage {
 		ctx.restore();
 	}
 
+	/**
+	 * Debug helper: grid over the whole visible area, with the axes through
+	 * (0, 0) highlighted and every major line labelled with its coordinate.
+	 * Uses halfW / halfH, so it always fills the screen after a resize.
+	 * Line widths and text are in screen pixels, so they stay crisp at any size.
+	 * @param {object} [opts]
+	 * @param {number} [opts.step=50]       units between grid lines
+	 * @param {number} [opts.majorEvery=2]  every nth line is major (darker, labelled)
+	 */
+	drawGrid({ step = 50, majorEvery = 2, color = 'rgba(0, 120, 255, 0.15)',
+		majorColor = 'rgba(0, 120, 255, 0.35)', axisColor = 'rgba(255, 0, 80, 0.7)' } = {}) {
+		const ctx = this.ctx;
+		const px = 1 / this.scale; // one CSS pixel in units
+		const { halfW, halfH } = this;
+
+		// Grid lines run from the first multiple of `step` off-screen, so they stay anchored to (0, 0)
+		const x0 = Math.ceil(-halfW / step), x1 = Math.floor(halfW / step);
+		const y0 = Math.ceil(-halfH / step), y1 = Math.floor(halfH / step);
+
+		ctx.save();
+		ctx.setLineDash([]);
+
+		const line = (ax, ay, bx, by, style, width) => {
+			ctx.beginPath();
+			ctx.moveTo(ax, ay);
+			ctx.lineTo(bx, by);
+			ctx.strokeStyle = style;
+			ctx.lineWidth = width * px;
+			ctx.stroke();
+		};
+
+		for (let i = x0; i <= x1; i++) {
+			if (i === 0) continue;
+			line(i * step, -halfH, i * step, halfH, i % majorEvery ? color : majorColor, 1);
+		}
+		for (let j = y0; j <= y1; j++) {
+			if (j === 0) continue;
+			line(-halfW, j * step, halfW, j * step, j % majorEvery ? color : majorColor, 1);
+		}
+
+		// Axes on top
+		line(-halfW, 0, halfW, 0, axisColor, 1.5);
+		line(0, -halfH, 0, halfH, axisColor, 1.5);
+
+		// Labels along the axes
+		ctx.fillStyle = axisColor;
+		ctx.font = `${11 * px}px monospace`;
+		ctx.textAlign = 'left';
+		ctx.textBaseline = 'top';
+		for (let i = x0; i <= x1; i++) {
+			if (i % majorEvery === 0) ctx.fillText(String(i * step), i * step + 3 * px, 3 * px);
+		}
+		for (let j = y0; j <= y1; j++) {
+			if (j % majorEvery === 0 && j !== 0) ctx.fillText(String(j * step), 3 * px, j * step + 3 * px);
+		}
+
+		// Visible extents in the top-left corner
+		ctx.fillText(`x ±${halfW.toFixed(0)}  y ±${halfH.toFixed(0)}`, -halfW + 6 * px, -halfH + 6 * px);
+
+		ctx.restore();
+	}
+
 	restart() { this.time = 0; }
 	seek(seconds) { this.time = Math.max(0, seconds); }
 	pause() { this.paused = true; }
@@ -262,21 +324,40 @@ export class DrawPath {
 
 	// Arc from angle a0 to a1 (radians). Connects from the current point if there is one.
 	arc(cx, cy, r, a0, a1, steps = 48) {
-		const sx = cx + Math.cos(a0) * r;
-		const sy = cy + Math.sin(a0) * r;
-		if (this.points.length) this.lineTo(sx, sy);
-		else this.moveTo(sx, sy);
-
-		for (let i = 1; i <= steps; i++) {
-			const a = a0 + (a1 - a0) * (i / steps);
-			this._push(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
-		}
-		return this;
+		return this.ellipseArc(cx, cy, r, r, 0, a0, a1, steps);
 	}
 
 	// Full circle, drawn clockwise starting from `startAngle` (default: top)
 	circle(cx, cy, r, startAngle = -Math.PI / 2, steps = 64) {
 		return this.arc(cx, cy, r, startAngle, startAngle + Math.PI * 2, steps);
+	}
+
+	/**
+	 * Elliptical arc from angle a0 to a1 (radians), with radii rx / ry and the
+	 * whole ellipse turned by `rotation` (radians) about its centre.
+	 * Same argument order as ctx.ellipse. Connects from the current point if there is one.
+	 */
+	ellipseArc(cx, cy, rx, ry, rotation, a0, a1, steps = 48) {
+		const cos = Math.cos(rotation), sin = Math.sin(rotation);
+		const at = a => {
+			const ex = Math.cos(a) * rx, ey = Math.sin(a) * ry;
+			return [cx + ex * cos - ey * sin, cy + ex * sin + ey * cos];
+		};
+
+		const [sx, sy] = at(a0);
+		if (this.points.length) this.lineTo(sx, sy);
+		else this.moveTo(sx, sy);
+
+		for (let i = 1; i <= steps; i++) {
+			const [x, y] = at(a0 + (a1 - a0) * (i / steps));
+			this._push(x, y);
+		}
+		return this;
+	}
+
+	// Full ellipse, drawn clockwise starting from `startAngle` (default: top)
+	ellipse(cx, cy, rx, ry, rotation = 0, startAngle = -Math.PI / 2, steps = 64) {
+		return this.ellipseArc(cx, cy, rx, ry, rotation, startAngle, startAngle + Math.PI * 2, steps);
 	}
 
 	// Rectangle from its top-left corner, drawn clockwise
@@ -362,7 +443,8 @@ export class Stroke {
 		this.lineWidth = opts.lineWidth || 2;   // in units
 		this.dash = opts.dash || null;          // e.g. [10, 6]
 
-		this.fill = opts.fill || null;          // fades in once the outline is complete
+		this.stroke = opts.stroke ?? true;      // false = fill only, no outline
+		this.fill = opts.fill || null;          // fades in once the outline is complete (or straight away if stroke is false)
 		this.fillDuration = opts.fillDuration ?? 0.6;
 
 		this.pen = opts.pen ?? true;            // small dot at the drawing tip
@@ -387,13 +469,19 @@ export class Stroke {
 		ctx.save();
 		ctx.globalAlpha *= alpha;
 
-		if (this.fill && local > this.duration) {
+		const fillStart = this.stroke ? this.duration : 0;
+		if (this.fill && local > fillStart) {
 			ctx.save();
-			ctx.globalAlpha *= clamp01((local - this.duration) / this.fillDuration);
+			ctx.globalAlpha *= clamp01((local - fillStart) / this.fillDuration);
 			this.path.trace(ctx, 1);
 			ctx.fillStyle = this.fill;
 			ctx.fill();
 			ctx.restore();
+		}
+
+		if (!this.stroke) {
+			ctx.restore();
+			return;
 		}
 
 		const tip = this.path.trace(ctx, p);
@@ -548,10 +636,13 @@ export class Timeline {
 
 	/**
 	 * Draws a path. duration in seconds; if omitted, it comes from
-	 * `speed` (units per second, default 500).
+	 * `speed` (units per second, default 500). With stroke: false
+	 * (fill only) it defaults to fillDuration instead.
 	 */
 	add(path, opts = {}) {
-		const duration = opts.duration ?? Math.max(0.3, path.length / (opts.speed ?? 500));
+		const duration = opts.duration ?? (opts.stroke === false
+			? opts.fillDuration ?? 0.6
+			: Math.max(0.3, path.length / (opts.speed ?? 500)));
 		this.place(new Stroke(path, { ...opts, duration }), opts);
 		return this;
 	}
