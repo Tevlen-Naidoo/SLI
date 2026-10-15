@@ -1,9 +1,14 @@
 import { Stage, Timeline, Ease, keyframes } from './framework.js';
-import { sun, hill1, betterHill1, hill2, hill3, mountain, flower1, flower2, flower3, distantHills, detailedMountain } from './objects.js';
+import { sun, hill1, betterHill1, hill2, hill3, mountain, flower1, flower2, flower3, distantHills, detailedMountain, meadow } from './objects.js';
+import { seededRandom } from './utilities.js';
 import { message } from './message.js';
 import { SCRIPT } from './script.js';
 
 const DEBUG = true; // true = show the coordinate grid and design area outline
+
+// How much the scene is faded behind the message: 0 = not at all, 1 = white.
+// Strongest in the middle, where the text is, easing off towards the edges.
+const MUTE = { centre: 0.55, edges: 0.3 };
 
 const stage = new Stage(document.getElementById('background'), {
 	designWidth: 1600,
@@ -41,7 +46,7 @@ function buildScene({ halfW, halfH }) {
 	// flower1(tl, { x: 0, y: 400 });
 	// flower2(tl, { x: 0, y: 400 }); // (x, y) = stalk base; add scale: 0.3 etc. to shrink
 
-	// Back to front: sun, mountain, hills, flowers, then the message on top
+	// Back to front: sun, mountain, hills with their flowers, a wash to mute it all, then the message on top
 
 	// The sun rises from behind the hills and settles just behind the peak (at y -315),
 	// turning slowly the whole time. It waits for the hills to fill in so it's hidden as it starts.
@@ -54,13 +59,36 @@ function buildScene({ halfW, halfH }) {
 	});
 
 	detailedMountain(tl, { x: 0, y: 150, at: 0 });
-	distantHills(tl, edge, bottom, { at: 0.8 });
 
-	flower1(tl, { x: -560, y: 450, scale: 0.45, at: 2.5 });
-	flower2(tl, { x: -260, y: 460, scale: 0.35, at: 2.8 });
-	flower3(tl, { x: 520, y: 450, scale: 0.55, at: 3 });
+	// Flowers scattered over each hill, tucked behind the hills in front of them.
+	// Further up the screen = further away = smaller. Change the seed for a different layout.
+	const random = seededRandom(14);
+	const perspective = y => 0.04 + 0.22 * Math.pow(Math.max(0, Math.min(1, y / 470)), 1.3);
+	const flowerBeds = [
+		{ count: 26, depth: [8, 50] },    // far hill
+		{ count: 20, depth: [10, 60] },   // middle hill
+		{ count: 16, depth: [25, 170] },  // near hill, right down to the bottom of the screen
+	];
 
-	message(tl, SCRIPT, { x: 0, y: -370, at: 0 });
+	distantHills(tl, edge, bottom, {
+		at: 0.8,
+		onHill: (s, hill) => meadow(s, hill.surfaceAt, {
+			...flowerBeds[hill.index], edge, perspective, random,
+			start: hill.start + 2.4,  // once the hill's outline is drawn
+		}),
+	});
+
+	// Soft white wash over the whole scene, so the message reads clearly on top
+	tl.clip(ctx => {
+		const radius = Math.hypot(halfW, halfH);
+		const wash = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+		wash.addColorStop(0, `rgba(255, 255, 255, ${MUTE.centre})`);
+		wash.addColorStop(1, `rgba(255, 255, 255, ${MUTE.edges})`);
+		ctx.fillStyle = wash;
+		ctx.fillRect(-halfW, -halfH, halfW * 2, halfH * 2);
+	}, { at: 0 });
+
+	message(tl, SCRIPT, { x: 0, y: 0, at: 0 });
 
 	return tl;
 }

@@ -542,7 +542,7 @@ export class Stroke {
    Layer
    A group with its own timeline. Its children's times are relative to the
    layer's start. x, y, rotation, scale and opacity can be numbers or
-   functions of the layer's local time in seconds.
+   functions of the layer's local time in seconds. flipX mirrors it.
    ========================================================================== */
 
 export class Layer {
@@ -555,6 +555,7 @@ export class Layer {
 		this.y = opts.y ?? 0;
 		this.rotation = opts.rotation ?? 0;  // radians
 		this.scale = opts.scale ?? 1;
+		this.flipX = opts.flipX ?? false;    // true = mirrored left to right
 		this.opacity = opts.opacity ?? 1;
 
 		this.fadeIn = opts.fadeIn ?? 0;
@@ -579,7 +580,7 @@ export class Layer {
 		ctx.globalAlpha *= alpha;
 		ctx.translate(valueAt(this.x, t), valueAt(this.y, t));
 		ctx.rotate(valueAt(this.rotation, t));
-		ctx.scale(s, s);
+		ctx.scale(this.flipX ? -s : s, s);
 		this.timeline.draw(ctx, t);
 		ctx.restore();
 	}

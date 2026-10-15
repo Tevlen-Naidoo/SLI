@@ -198,7 +198,9 @@ function stalkLeaves(s, stalk, a, b, duration, scale = 1) {
 	}
 }
 
-export function flower1(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
+export function flower1(tl, { x = 0, y = 0, scale = 1, line = 1, ...timing } = {}) {
+
+	const lw = line / scale; // outline widths: the same as the rest of the scene, times `line`
 
 	// (x, y) is the base of the stalk; scale keeps outlines the same width as the rest of the scene
 	tl.layer({ x, y: y - STALK_HEIGHT * scale, scale, ...timing }, s => {
@@ -206,30 +208,30 @@ export function flower1(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
 		// stalk, from the ground up to the head at (0, 0)
 		const stalk = new DrawPath().moveTo(0, STALK_HEIGHT).cubicTo(-100, 300, 100, 100, 0, 0);
 		s.add(stalk, {
-			color: shade(PISTACHIO, 0.35), lineWidth: 4 / scale, duration: 1,
+			color: shade(PISTACHIO, 0.35), lineWidth: 4 * lw, duration: 1,
 		});
 
 		// leaves, drawn before the head so the petals sit over them
 		stalkLeaves(s, stalk,
 			{ at: 0.3, angle: -150, length: 110, width: 45 },
 			{ at: 0.5, angle: -35, length: 90, width: 38 },
-			0.6, scale);
+			0.6, scale / line);
 
 		// head: its own layer, so petals and centre are drawn around (0, 0)
 		s.layer({ x: 0, y: 0 }, h => {
 
 			// back ring, then a front ring offset by half a petal
 			h.add(petals(12, 40, 150, 50), {
-				color: '#c2416b', lineWidth: 3 / scale, fill: 'rgba(236, 120, 160, 0.35)', duration: 1.5,
+				color: '#c2416b', lineWidth: 3 * lw, fill: 'rgba(236, 120, 160, 0.35)', duration: 1.5,
 			});
 
 			h.add(petals(12, 35, 110, 40, 15), {
-				color: '#d4602a', lineWidth: 3 / scale, fill: 'rgba(242, 193, 78, 0.4)', duration: 1.2, at: 'with', delay: 0.4,
+				color: '#d4602a', lineWidth: 3 * lw, fill: 'rgba(242, 193, 78, 0.4)', duration: 1.2, at: 'with', delay: 0.4,
 			});
 
 			// centre on top, covering the petal bases
 			h.add(new DrawPath().circle(0, 0, 50), {
-				color: '#e0962f', lineWidth: 3 / scale, fill: 'rgba(224, 150, 47, 0.9)', duration: 0.6,
+				color: '#e0962f', lineWidth: 3 * lw, fill: 'rgba(224, 150, 47, 0.9)', duration: 0.6,
 			});
 		});
 
@@ -237,7 +239,9 @@ export function flower1(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
 
 }
 
-export function flower2(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
+export function flower2(tl, { x = 0, y = 0, scale = 1, line = 1, ...timing } = {}) {
+
+	const lw = line / scale; // outline widths: the same as the rest of the scene, times `line`
 
 	// (x, y) is the base of the stalk; scale keeps outlines the same width as the rest of the scene
 	tl.layer({ x, y: y - STALK_HEIGHT * scale, scale, ...timing }, s => {
@@ -245,26 +249,26 @@ export function flower2(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
 		// stalk, from the ground up to the head at (0, 0)
 		const stalk = new DrawPath().moveTo(0, STALK_HEIGHT).cubicTo(100, 300, -100, 100, 0, 0);
 		s.add(stalk, {
-			color: shade(PISTACHIO, 0.35), lineWidth: 4 / scale, duration: 0,
+			color: shade(PISTACHIO, 0.35), lineWidth: 4 * lw, duration: 0,
 		});
 
 		// leaves, kept low so the big petals don't cover them
 		stalkLeaves(s, stalk,
 			{ at: 0.15, angle: -30, length: 110, width: 45 },
 			{ at: 0.35, angle: -150, length: 100, width: 40 },
-			0, scale);
+			0, scale / line);
 
 		// head: its own layer, so petals and centre are drawn around (0, 0)
 		s.layer({ x: 0, y: 0 }, h => {
 
 			// back ring, then a front ring offset by half a petal
 			h.add(petals(5, 30, 200, 150), {
-				color: '#c2416b', lineWidth: 3 / scale, fill: 'rgba(236, 120, 160, 0.35)', duration: 0,
+				color: '#c2416b', lineWidth: 3 * lw, fill: 'rgba(236, 120, 160, 0.35)', duration: 0,
 			});
 
 			// centre on top, covering the petal bases
 			h.add(new DrawPath().circle(0, 0, 70), {
-				color: '#e0962f', lineWidth: 3 / scale, fill: 'rgba(224, 150, 47, 0.9)', duration: 0,
+				color: '#e0962f', lineWidth: 3 * lw, fill: 'rgba(224, 150, 47, 0.9)', duration: 0,
 			});
 		});
 
@@ -328,7 +332,9 @@ export function spiral(turns, r0, r1, startDeg = 0) {
 	return path;
 }
 
-export function flower3(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
+export function flower3(tl, { x = 0, y = 0, scale = 1, line = 1, ...timing } = {}) {
+
+	const lw = line / scale; // outline widths: the same as the rest of the scene, times `line`
 
 	// (x, y) is the base of the stalk; scale keeps outlines the same width as the rest of the scene
 	tl.layer({ x, y: y - STALK_HEIGHT * scale, scale, ...timing }, s => {
@@ -336,13 +342,13 @@ export function flower3(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
 		// stalk, from the ground up to the head at (0, 0)
 		const stalk = new DrawPath().moveTo(0, STALK_HEIGHT).cubicTo(-60, 280, 80, 140, 0, 0);
 		s.add(stalk, {
-			color: shade(PISTACHIO, 0.35), lineWidth: 4 / scale, duration: 1,
+			color: shade(PISTACHIO, 0.35), lineWidth: 4 * lw, duration: 1,
 		});
 
 		stalkLeaves(s, stalk,
 			{ at: 0.2, angle: -160, length: 110, width: 45 },
 			{ at: 0.4, angle: -25, length: 95, width: 40 },
-			0.6, scale);
+			0.6, scale / line);
 
 		// head: its own layer, so petals and centre are drawn around (0, 0)
 		s.layer({ x: 0, y: 0 }, h => {
@@ -356,20 +362,20 @@ export function flower3(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
 			// back ring, then a smaller front ring offset by half a petal, each one continuous loopy line
 			h.add(loopPetals(8, 34, 175, 78, 20), {
 				at: 0,
-				color: shade(LAVENDER, 0.45), lineWidth: 3 / scale, fill: rgba(LAVENDER, 0.85), duration: 1.8,
+				color: shade(LAVENDER, 0.45), lineWidth: 3 * lw, fill: rgba(LAVENDER, 0.85), duration: 1.8,
 			});
 
 			h.add(loopPetals(8, 34, 120, 50, 15, 22.5), {
-				color: shade(FLAMINGO, 0.45), lineWidth: 3 / scale, fill: rgba(FLAMINGO, 0.9), duration: 1.4, at: 'with', delay: 0.5,
+				color: shade(FLAMINGO, 0.45), lineWidth: 3 * lw, fill: rgba(FLAMINGO, 0.9), duration: 1.4, at: 'with', delay: 0.5,
 			});
 
 			// centre covers where the petals hop from one to the next, with a little swirl on top
 			h.add(new DrawPath().circle(0, 0, 38), {
-				color: shade(VANILLA, 0.45), lineWidth: 3 / scale, fill: VANILLA.rgb, duration: 0.6,
+				color: shade(VANILLA, 0.45), lineWidth: 3 * lw, fill: VANILLA.rgb, duration: 0.6,
 			});
 
 			h.add(spiral(2, 4, 26, -90), {
-				color: shade(VANILLA, 0.45), lineWidth: 2.5 / scale, duration: 0.6, at: 'with', delay: 0.3,
+				color: shade(VANILLA, 0.45), lineWidth: 2.5 * lw, duration: 0.6, at: 'with', delay: 0.3,
 			});
 		});
 
@@ -394,8 +400,14 @@ function hillRidge(edge, baseY, amplitude, spacing, seed) {
 /**
  * Layers of soft, rolling hills, furthest first. Each one runs off both
  * sides of the screen and fills down past the bottom (`bottom` = halfH + a bit).
+ *
+ * onHill(s, hill) runs straight after each hill is added, before the next
+ * (nearer) one, so whatever it adds sits on that hill and is tucked behind
+ * the hills in front. hill = { index, start, surfaceAt(x) }, where
+ * surfaceAt gives the y of the hilltop line at any x, and start is when
+ * the hill is drawn (times are relative to this layer).
  */
-export function distantHills(tl, edge, bottom, { x = 0, y = 0, ...timing } = {}) {
+export function distantHills(tl, edge, bottom, { x = 0, y = 0, onHill = null, ...timing } = {}) {
 
 	const ranges = [
 		{ y: 60, amplitude: 60, spacing: 300, seed: 3, colour: LAVENDER },
@@ -407,17 +419,72 @@ export function distantHills(tl, edge, bottom, { x = 0, y = 0, ...timing } = {})
 		for (const [i, r] of ranges.entries()) {
 			const pts = hillRidge(edge, r.y, r.amplitude, r.spacing, r.seed);
 			const first = pts[0][0], last = pts[pts.length - 1][0];
+			const start = i * 0.5;
 
 			// ridge first, so the pen draws the visible line before running off-screen to close the shape
+			const ridge = new DrawPath().smooth(pts);
 			const hill = new DrawPath().smooth(pts).lineTo(last, bottom).lineTo(first, bottom).close();
 
 			s.add(hill, {
-				color: shade(r.colour, 0.3), lineWidth: 3, fill: r.colour.rgb, duration: 2.4,
-				...(i > 0 && { at: 'with', delay: 0.5 }),
+				color: shade(r.colour, 0.3), lineWidth: 3, fill: r.colour.rgb, duration: 2.4, at: start,
 			});
+
+			if (onHill) onHill(s, { index: i, start, surfaceAt: px => surfaceAt(ridge, px) });
 		}
 	});
 
+}
+
+// y of a left-to-right line (like a hill ridge) at x, from its sampled points
+function surfaceAt(path, x) {
+	const pts = path.points;
+	if (x <= pts[0].x) return pts[0].y;
+	for (let i = 1; i < pts.length; i++) {
+		if (pts[i].x >= x) {
+			const a = pts[i - 1], b = pts[i];
+			return a.y + (b.y - a.y) * ((x - a.x) / (b.x - a.x || 1));
+		}
+	}
+	return pts[pts.length - 1].y;
+}
+
+/**
+ * Scatters flowers over a hill (use it from distantHills' onHill).
+ * Each flower gets a random type, a random left/right flip and a random
+ * spot a little below the hilltop. Size comes from `perspective(y)`, so the
+ * further up the screen (further away) a flower stands, the smaller it is.
+ *
+ * @param {object} opts
+ * @param {number} opts.count          how many flowers
+ * @param {number} opts.edge           spread them from -edge to edge
+ * @param {[number, number]} opts.depth  how far below the hilltop the stalk base can be [min, max]
+ * @param {function} opts.perspective  y => scale
+ * @param {function} opts.random       0..1 generator (use seededRandom so the layout is stable)
+ * @param {number} [opts.start=0]      first flower starts growing at this time
+ * @param {number} [opts.spread=3]     the rest start at random over this many seconds
+ */
+export function meadow(tl, surfaceAt, { count, edge, depth, perspective, random, start = 0, spread = 3 }) {
+	const kinds = [flower1, flower2, flower3];
+	const flowers = [];
+
+	for (let i = 0; i < count; i++) {
+		// even spacing with a random nudge, so they cover the hill without clumping
+		const x = -edge + (2 * edge) * ((i + 0.15 + random() * 0.7) / count);
+		const y = surfaceAt(x) + depth[0] + random() * (depth[1] - depth[0]);
+		const scale = perspective(y);
+
+		flowers.push({
+			kind: kinds[Math.floor(random() * kinds.length)],
+			x, y, scale,
+			line: Math.min(1, 0.4 + scale * 1.2),  // finer outlines on far-away flowers
+			flipX: random() < 0.5,
+			at: start + random() * spread,
+		});
+	}
+
+	// furthest (highest up) first, so nearer flowers overlap them
+	flowers.sort((a, b) => a.y - b.y);
+	for (const { kind, ...opts } of flowers) kind(tl, opts);
 }
 
 /**
