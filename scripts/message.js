@@ -1,4 +1,5 @@
 import { unipolarSineWave, noise2D } from "./utilities.js";
+import { SCRIPT } from "./script.js";
 
 const canvas = document.getElementById('background');
 const context = canvas.getContext('2d');
@@ -20,10 +21,10 @@ document.fonts.ready.then(() => {
 	textStyle.font = "50pt 'Yuyu'";
 })
 
-const script = [
-	"Hello, World",
-	"I hope you're doing well"
-];
+// const SCRIPT = [
+// 	"Hello, World",
+// 	"I hope you're doing well"
+// ];
 
 function caret(x, y) {
 	context.save();
@@ -199,7 +200,7 @@ function drawWiggleText(message, x, y) {
 }
 
 function showMessage() {
-	const message = script[currentMessageIndex];
+	const message = SCRIPT[currentMessageIndex];
 	const visibleText = message.substring(0, characterShown);
 
 	const totalWidth = context.measureText(visibleText).width;
@@ -229,7 +230,7 @@ function init() {
 function update(deltaTime) {
 	elapsedTime += deltaTime;
 
-	const message = script[currentMessageIndex];
+	const message = SCRIPT[currentMessageIndex];
 
 	switch (phase) {
 		case "typing": {
@@ -256,7 +257,7 @@ function update(deltaTime) {
 			pauseTimer += deltaTime;
 
 			if (pauseTimer >= displayDuration) {
-				if (currentMessageIndex == script.length - 1) {
+				if (currentMessageIndex == SCRIPT.length - 1) {
 					phase = "done";
 
 				}
