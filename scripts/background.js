@@ -1,5 +1,5 @@
 import { Stage, Timeline, Ease, keyframes } from './framework.js';
-import { sun, hill1, betterHill1, hill2, hill3, mountain, flower1, flower2, flower3, distantHills, detailedMountain, meadow } from './objects.js';
+import { sun, hill1, betterHill1, hill2, hill3, mountain, flower1, flower2, flower3, distantHills, detailedMountain, meadow, hillPath, grass } from './objects.js';
 import { seededRandom } from './utilities.js';
 import { message } from './message.js';
 import { SCRIPT } from './script.js';
@@ -46,36 +46,65 @@ function buildScene({ halfW, halfH }) {
 	// flower1(tl, { x: 0, y: 400 });
 	// flower2(tl, { x: 0, y: 400 }); // (x, y) = stalk base; add scale: 0.3 etc. to shrink
 
-	// Back to front: sun, mountain, hills with their flowers, a wash to mute it all, then the message on top
+	/* Choreography (seconds). Things are added back to front so they overlap
+	   correctly, but each one gets an explicit start time, so the animation
+	   runs front to back: hills (nearest first), path, mountain, flowers
+	   (nearest first), then the sun. */
+	const hillTime = 2.6;                     // each hill: 2s outline + 0.6s fill
+	const pathAt = hillTime * 3;              // once all three hills are in
+	const pathLeg = 1;                        // each hill's piece of path
+	const mountainAt = pathAt + pathLeg * 3 + 0.5;
+	const flowersAt = mountainAt + 6;         // the mountain takes about 6s
+	const flowerLeg = 2;                      // each hill's flowers start over this long
+	const sunAt = flowersAt + flowerLeg * 3 + 1;
 
 	// The sun rises from behind the hills and settles just behind the peak (at y -315),
-	// turning slowly the whole time. It waits for the hills to fill in so it's hidden as it starts.
+	// turning slowly the whole time.
 	sun(tl, {
 		x: 0,
 		y: keyframes([[0, 260], [6, -300]], Ease.outCubic),  // [seconds, y]: start low, ease to a stop
 		rotation: t => t * 0.12,                              // radians per second, about one turn a minute
 		scale: 0.4,
-		at: 4,
+		at: sunAt,
 	});
 
-	detailedMountain(tl, { x: 0, y: 150, at: 0 });
+	detailedMountain(tl, { x: 0, y: 150, at: mountainAt });
 
-	// Flowers scattered over each hill, tucked behind the hills in front of them.
 	// Further up the screen = further away = smaller. Change the seed for a different layout.
 	const random = seededRandom(14);
 	const perspective = y => 0.04 + 0.22 * Math.pow(Math.max(0, Math.min(1, y / 470)), 1.3);
-	const flowerBeds = [
-		{ count: 26, depth: [8, 50] },    // far hill
-		{ count: 20, depth: [10, 60] },   // middle hill
-		{ count: 16, depth: [25, 170] },  // near hill, right down to the bottom of the screen
+
+	// Per hill, furthest first: flowers, grass, and the path's route over it
+	const beds = [
+		{ flowers: 26, grass: 70, depth: [8, 50] },    // far hill
+		{ flowers: 20, grass: 55, depth: [10, 60] },   // middle hill
+		{ flowers: 16, grass: 40, depth: [25, 170] },  // near hill, right down to the bottom of the screen
 	];
 
+	const path = hillPath([
+		{ from: -30, to: 20, bend: -25 },   // far hill: ends at the foot of the mountain
+		{ from: 80, to: -40, bend: 50 },
+		{ from: 380, to: 130, bend: -110 }, // near hill: starts at the bottom of the screen
+	], { bottom, halfWidth: y => 380 * perspective(y) });
+
 	distantHills(tl, edge, bottom, {
-		at: 0.8,
-		onHill: (s, hill) => meadow(s, hill.surfaceAt, {
-			...flowerBeds[hill.index], edge, perspective, random,
-			start: hill.start + 2.4,  // once the hill's outline is drawn
-		}),
+		at: 0,
+		startFor: i => (2 - i) * hillTime,  // nearest hill first
+		duration: 2, fillDuration: 0.6,
+		onHill: (s, hill, hills) => {
+			const nearness = 2 - hill.index;  // 0 for the nearest hill
+			const bed = { ...beds[hill.index], edge, perspective, random, avoid: path.avoid };
+
+			// path first, so the flowers and grass know to keep off it
+			path.draw(s, hill, hills, pathAt + nearness * pathLeg, pathLeg);
+
+			grass(s, hill.surfaceAt, { ...bed, count: bed.grass, colour: hill.colour, at: hill.end });
+
+			meadow(s, hill.surfaceAt, {
+				...bed, count: bed.flowers,
+				start: flowersAt + nearness * flowerLeg, spread: flowerLeg,
+			});
+		},
 	});
 
 	// Soft white wash over the whole scene, so the message reads clearly on top

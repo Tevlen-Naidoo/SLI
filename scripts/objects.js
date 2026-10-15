@@ -6,7 +6,7 @@
    ========================================================================== */
 
 import { PISTACHIO, LAVENDER, FLAMINGO, VANILLA, SOFTSKY, DENIM, rgba, shade } from './colours.js';
-import { DrawPath } from './framework.js';
+import { DrawPath, Ease, clamp01 } from './framework.js';
 import { degrees2radians, polar2cartesian, noise1D } from './utilities.js';
 
 export function rays(count, inner, outer, offsetDeg = 0) {
@@ -188,6 +188,9 @@ export function leaf(x, y, length, width, angleDeg) {
 // Flowers are drawn with the head at (0, 0) and the stalk base this far below it
 const STALK_HEIGHT = 400;
 
+// Roughly how far the biggest flower head reaches from its centre (before scaling)
+const FLOWER_RADIUS = 200;
+
 // Two leaves on a stalk: `a` and `b` are { at: 0..1 along the stalk, angle, length, width }
 function stalkLeaves(s, stalk, a, b, duration, scale = 1) {
 	const style = { color: shade(PISTACHIO, 0.35), lineWidth: 3 / scale, fill: PISTACHIO.rgb, duration };
@@ -249,26 +252,26 @@ export function flower2(tl, { x = 0, y = 0, scale = 1, line = 1, ...timing } = {
 		// stalk, from the ground up to the head at (0, 0)
 		const stalk = new DrawPath().moveTo(0, STALK_HEIGHT).cubicTo(100, 300, -100, 100, 0, 0);
 		s.add(stalk, {
-			color: shade(PISTACHIO, 0.35), lineWidth: 4 * lw, duration: 0,
+			color: shade(PISTACHIO, 0.35), lineWidth: 4 * lw, duration: 1,
 		});
 
 		// leaves, kept low so the big petals don't cover them
 		stalkLeaves(s, stalk,
 			{ at: 0.15, angle: -30, length: 110, width: 45 },
 			{ at: 0.35, angle: -150, length: 100, width: 40 },
-			0, scale / line);
+			0.6, scale / line);
 
 		// head: its own layer, so petals and centre are drawn around (0, 0)
 		s.layer({ x: 0, y: 0 }, h => {
 
 			// back ring, then a front ring offset by half a petal
 			h.add(petals(5, 30, 200, 150), {
-				color: '#c2416b', lineWidth: 3 * lw, fill: 'rgba(236, 120, 160, 0.35)', duration: 0,
+				color: '#c2416b', lineWidth: 3 * lw, fill: 'rgba(236, 120, 160, 0.35)', duration: 1.5,
 			});
 
 			// centre on top, covering the petal bases
 			h.add(new DrawPath().circle(0, 0, 70), {
-				color: '#e0962f', lineWidth: 3 * lw, fill: 'rgba(224, 150, 47, 0.9)', duration: 0,
+				color: '#e0962f', lineWidth: 3 * lw, fill: 'rgba(224, 150, 47, 0.9)', duration: 0.6,
 			});
 		});
 
@@ -401,13 +404,21 @@ function hillRidge(edge, baseY, amplitude, spacing, seed) {
  * Layers of soft, rolling hills, furthest first. Each one runs off both
  * sides of the screen and fills down past the bottom (`bottom` = halfH + a bit).
  *
- * onHill(s, hill) runs straight after each hill is added, before the next
- * (nearer) one, so whatever it adds sits on that hill and is tucked behind
- * the hills in front. hill = { index, start, surfaceAt(x) }, where
- * surfaceAt gives the y of the hilltop line at any x, and start is when
- * the hill is drawn (times are relative to this layer).
+ * onHill(s, hill, hills) runs straight after each hill is added, before the
+ * next (nearer) one, so whatever it adds sits on that hill and is tucked
+ * behind the hills in front. hill = { index, start, end, surfaceAt(x) }:
+ * surfaceAt gives the y of the hilltop line at any x, start / end are when
+ * the hill starts drawing and finishes filling in (relative to this layer).
+ * `hills` is all of them, furthest first, for things that need the hill in front.
+ *
+ * startFor(index) sets when each hill starts (index 0 = furthest).
+ * By default they start half a second apart, back to front.
  */
-export function distantHills(tl, edge, bottom, { x = 0, y = 0, onHill = null, ...timing } = {}) {
+export function distantHills(tl, edge, bottom, {
+	x = 0, y = 0, onHill = null,
+	startFor = i => i * 0.5, duration = 2.4, fillDuration = 0.6,
+	...timing
+} = {}) {
 
 	const ranges = [
 		{ y: 60, amplitude: 60, spacing: 300, seed: 3, colour: LAVENDER },
@@ -415,21 +426,27 @@ export function distantHills(tl, edge, bottom, { x = 0, y = 0, onHill = null, ..
 		{ y: 300, amplitude: 45, spacing: 200, seed: 12, colour: PISTACHIO },
 	];
 
+	// Work out every ridge first: things on one hill may need to know about the hill in front
+	const hills = ranges.map((r, i) => {
+		const pts = hillRidge(edge, r.y, r.amplitude, r.spacing, r.seed);
+		const ridge = new DrawPath().smooth(pts);
+		const start = startFor(i);
+		return { index: i, colour: r.colour, pts, start, end: start + duration + fillDuration, surfaceAt: px => surfaceAt(ridge, px) };
+	});
+
 	tl.layer({ x, y, ...timing }, s => {
-		for (const [i, r] of ranges.entries()) {
-			const pts = hillRidge(edge, r.y, r.amplitude, r.spacing, r.seed);
+		for (const hill of hills) {
+			const { pts, colour } = hill;
 			const first = pts[0][0], last = pts[pts.length - 1][0];
-			const start = i * 0.5;
 
 			// ridge first, so the pen draws the visible line before running off-screen to close the shape
-			const ridge = new DrawPath().smooth(pts);
-			const hill = new DrawPath().smooth(pts).lineTo(last, bottom).lineTo(first, bottom).close();
+			const shape = new DrawPath().smooth(pts).lineTo(last, bottom).lineTo(first, bottom).close();
 
-			s.add(hill, {
-				color: shade(r.colour, 0.3), lineWidth: 3, fill: r.colour.rgb, duration: 2.4, at: start,
+			s.add(shape, {
+				color: shade(colour, 0.3), lineWidth: 3, fill: colour.rgb, duration, fillDuration, at: hill.start,
 			});
 
-			if (onHill) onHill(s, { index: i, start, surfaceAt: px => surfaceAt(ridge, px) });
+			if (onHill) onHill(s, hill, hills);
 		}
 	});
 
@@ -462,16 +479,25 @@ function surfaceAt(path, x) {
  * @param {function} opts.random       0..1 generator (use seededRandom so the layout is stable)
  * @param {number} [opts.start=0]      first flower starts growing at this time
  * @param {number} [opts.spread=3]     the rest start at random over this many seconds
+ * @param {function} [opts.avoid]      (x, y, radius) => true to keep a flower out of a spot (e.g. a path)
  */
-export function meadow(tl, surfaceAt, { count, edge, depth, perspective, random, start = 0, spread = 3 }) {
+export function meadow(tl, surfaceAt, { count, edge, depth, perspective, random, start = 0, spread = 3, avoid = null }) {
 	const kinds = [flower1, flower2, flower3];
 	const flowers = [];
 
 	for (let i = 0; i < count; i++) {
-		// even spacing with a random nudge, so they cover the hill without clumping
-		const x = -edge + (2 * edge) * ((i + 0.15 + random() * 0.7) / count);
-		const y = surfaceAt(x) + depth[0] + random() * (depth[1] - depth[0]);
-		const scale = perspective(y);
+		// even spacing with a random nudge, so they cover the hill without clumping.
+		// A few tries to find a free spot; if there isn't one, this flower is skipped
+		let x, y, scale, free = false;
+		for (let attempt = 0; attempt < 8 && !free; attempt++) {
+			x = -edge + (2 * edge) * ((i + 0.15 + random() * 0.7) / count);
+			y = surfaceAt(x) + depth[0] + random() * (depth[1] - depth[0]);
+			scale = perspective(y);
+
+			// check where the stalk meets the ground and where the head is
+			free = !avoid || (!avoid(x, y, 10) && !avoid(x, y - STALK_HEIGHT * scale, FLOWER_RADIUS * scale));
+		}
+		if (!free) continue;
 
 		flowers.push({
 			kind: kinds[Math.floor(random() * kinds.length)],
@@ -491,7 +517,8 @@ export function meadow(tl, surfaceAt, { count, edge, depth, perspective, random,
  * Snowy mountain with a smaller peak behind it. Sharp lines (lineTo) for
  * the rocky ridges and crags, smooth lines (smooth) for the foothills,
  * snow line and lower slopes. (x, y) is the middle of its base; the main
- * peak is 465 units above it.
+ * peak is 465 units above it. The main peak draws first (about 4s), then
+ * the one behind it; the whole thing takes about 6s.
  */
 export function detailedMountain(tl, { x = 0, y = 0, scale = 1, ...timing } = {}) {
 
@@ -527,15 +554,17 @@ export function detailedMountain(tl, { x = 0, y = 0, scale = 1, ...timing } = {}
 		for (const [px, py] of [[-540, -200], [-515, -190], [-460, -280], [-420, -235], [-390, -245], [-340, -170]]) back.lineTo(px, py);
 		back.smooth([[-340, -170], [-300, -120], [-250, -60], [-200, 0]]).close();
 
+		// Times below are set explicitly: the main peak draws first, then this one,
+		// though this one is added first so it sits behind.
 		s.add(back, {
-			color: shade(LAVENDER, 0.4), lineWidth, fill: LAVENDER.rgb, duration: 1.4,
+			color: shade(LAVENDER, 0.4), lineWidth, fill: LAVENDER.rgb, duration: 1.2, fillDuration: 0.5, at: 4,
 		});
 
 		const backSnow = new DrawPath().moveTo(-490, -231).lineTo(-460, -280).lineTo(-440, -257)
 			.smooth([[-440, -257], [-450, -244], [-458, -256], [-470, -233], [-480, -243], [-490, -231]]);
 
 		s.add(backSnow, {
-			color: shade(LAVENDER, 0.4), lineWidth, fill: '#fbf8ff', duration: 0.5,
+			color: shade(LAVENDER, 0.4), lineWidth, fill: '#fbf8ff', duration: 0.4, at: 5.4,
 		});
 
 		// Main peak
@@ -544,7 +573,7 @@ export function detailedMountain(tl, { x = 0, y = 0, scale = 1, ...timing } = {}
 		body.smooth(rightSlope).close();
 
 		s.add(body, {
-			color: ink, lineWidth, fill: DENIM.rgb, duration: 2.2, at: 'with', delay: 0.3,
+			color: ink, lineWidth, fill: DENIM.rgb, duration: 1.8, fillDuration: 0.5, at: 0,
 		});
 
 		const snow = new DrawPath().moveTo(...snowTop[0]);
@@ -552,7 +581,7 @@ export function detailedMountain(tl, { x = 0, y = 0, scale = 1, ...timing } = {}
 		snow.smooth(snowLine);
 
 		s.add(snow, {
-			color: ink, lineWidth, fill: '#f6f9fd', duration: 1.2,
+			color: ink, lineWidth, fill: '#f6f9fd', duration: 1, fillDuration: 0.4, at: 1.8,
 		});
 
 		// Shaded face: right of the crease. Drawn over the snow (see-through) so the snow is shaded too.
@@ -563,7 +592,7 @@ export function detailedMountain(tl, { x = 0, y = 0, scale = 1, ...timing } = {}
 		for (const [px, py] of [...creaseTop].reverse().slice(1)) shadow.lineTo(px, py);
 
 		s.add(shadow, {
-			stroke: false, fill: 'rgba(40, 62, 100, 0.22)', fillDuration: 0.8,
+			stroke: false, fill: 'rgba(40, 62, 100, 0.22)', fillDuration: 0.8, at: 2.8,
 		});
 
 		// The crease itself
@@ -572,7 +601,7 @@ export function detailedMountain(tl, { x = 0, y = 0, scale = 1, ...timing } = {}
 		crease.smooth(creaseBottom);
 
 		s.add(crease, {
-			color: ink, lineWidth, duration: 0.8, at: 'with',
+			color: ink, lineWidth, duration: 0.8, at: 2.8,
 		});
 
 		// Rocky crags: short, sharp zig-zags
@@ -593,13 +622,13 @@ export function detailedMountain(tl, { x = 0, y = 0, scale = 1, ...timing } = {}
 
 		for (const [i, pts] of crags.entries()) {
 			s.add(polyline(pts), {
-				color: ink, lineWidth: 2.5 / scale, duration: 0.4, at: 'with', delay: i ? 0.12 : 0.4,
+				color: ink, lineWidth: 2.5 / scale, duration: 0.4, at: 3 + i * 0.12,
 			});
 		}
 
-		for (const pts of folds) {
+		for (const [i, pts] of folds.entries()) {
 			s.add(new DrawPath().smooth(pts), {
-				color: ink, lineWidth: 2.5 / scale, duration: 0.5, at: 'with', delay: 0.12,
+				color: ink, lineWidth: 2.5 / scale, duration: 0.5, at: 3.5 + i * 0.12,
 			});
 		}
 	});
@@ -611,4 +640,173 @@ export function polyline(pts) {
 	const path = new DrawPath();
 	for (const [x, y] of pts) path.lineTo(x, y);
 	return path;
+}
+
+/**
+ * A path winding up over the hills towards the mountain, narrowing with
+ * distance. It's drawn in pieces, one per hill: each piece climbs that
+ * hill's face from just behind the hill in front, up to its crest, so it
+ * dips out of sight behind each hilltop and reappears on the next.
+ *
+ * `route` has one entry per hill, furthest first: { from, to, bend }
+ *   from - x where the piece comes out from behind the hill in front (or the bottom of the screen)
+ *   to   - x where it goes over this hill's crest
+ *   bend - how far it swings sideways along the way
+ *
+ * Returns { draw(s, hill, hills, at), avoid(x, y, radius) }.
+ * Call draw from distantHills' onHill so each piece sits on its own hill.
+ */
+export function hillPath(route, { bottom, halfWidth, colour = VANILLA, lineWidth = 2.5 }) {
+	const pieces = [];
+
+	// Centre line of one piece at s (0 = bottom end, 1 = crest)
+	const centre = (piece, s) => ({
+		x: piece.from + (piece.to - piece.from) * s + piece.bend * Math.sin(Math.PI * Math.min(s, 1)),
+		y: piece.y0 + (piece.y1 - piece.y0) * s,
+	});
+
+	// One edge (side = -1 left, 1 right), cut off exactly where it crosses the hilltop
+	function edgeLine(piece, side, surfaceAt) {
+		const pts = [];
+		const steps = 40;
+		for (let i = 0; i <= steps * 1.5; i++) {
+			const c = centre(piece, i / steps);
+			const p = { x: c.x + side * halfWidth(c.y), y: c.y };
+			const above = p.y - surfaceAt(p.x); // < 0 once the edge is over the crest
+
+			if (above < 0 && pts.length) {
+				const prev = pts[pts.length - 1];
+				const before = prev.y - surfaceAt(prev.x);
+				const k = before / (before - above);
+				pts.push({ x: prev.x + (p.x - prev.x) * k, y: prev.y + (p.y - prev.y) * k });
+				break;
+			}
+			pts.push(p);
+		}
+		return pts;
+	}
+
+	function build(hill, hills) {
+		const leg = route[hill.index];
+		const nearer = hills[hill.index + 1];
+
+		// start hidden behind the hill in front (or below the screen), finish at this crest
+		const y0 = nearer ? nearer.surfaceAt(leg.from) + 30 : bottom;
+		const piece = { ...leg, y0, y1: hill.surfaceAt(leg.to) };
+		piece.left = edgeLine(piece, -1, hill.surfaceAt);
+		piece.right = edgeLine(piece, 1, hill.surfaceAt);
+		pieces[hill.index] = piece;
+		return piece;
+	}
+
+	return {
+		/**
+		 * Adds the piece of path that sits on `hill`: both edges draw at once over
+		 * `duration`, then the path's surface fades in between them.
+		 */
+		draw(s, hill, hills, at, duration = 1) {
+			const piece = build(hill, hills);
+			if (!piece.left.length || !piece.right.length) return;
+
+			const surface = new DrawPath();
+			for (const p of piece.left) surface.lineTo(p.x, p.y);
+			for (const p of [...piece.right].reverse()) surface.lineTo(p.x, p.y);
+			surface.close();
+
+			// surface first so the edges sit on top of it, but it fades in after they're drawn
+			s.add(surface, { stroke: false, fill: colour.rgb, fillDuration: 0.5, at: at + duration });
+
+			for (const side of [piece.left, piece.right]) {
+				const line = new DrawPath();
+				for (const p of side) line.lineTo(p.x, p.y);
+				s.add(line, { color: shade(colour, 0.4), lineWidth, duration, ease: Ease.linear, at });
+			}
+		},
+
+		// true if a circle at (x, y) with this radius touches the path (pieces drawn so far)
+		avoid(x, y, radius = 0) {
+			for (const piece of pieces) {
+				if (!piece) continue;
+				const s = (y - piece.y0) / (piece.y1 - piece.y0);
+				if (s < -0.05 || s > 1.5) continue;
+				const c = centre(piece, s);
+				if (Math.abs(x - c.x) < halfWidth(y) + radius + 6) return true;
+			}
+			return false;
+		},
+	};
+}
+
+/**
+ * Little tufts of grass over a hill that sway in a breeze. The breeze is a
+ * couple of slow waves rolling across the screen from left to right, so
+ * neighbouring tufts move together and gusts travel across the hills.
+ * The tufts sprout (grow up) when the clip starts.
+ *
+ * @param {object} opts
+ * @param {number} opts.count          how many tufts
+ * @param {number} opts.edge           spread them from -edge to edge
+ * @param {[number, number]} opts.depth  how far below the hilltop they can be [min, max]
+ * @param {function} opts.perspective  y => scale (same one as the flowers)
+ * @param {function} opts.random       0..1 generator
+ * @param {object} opts.colour         palette colour of the hill (the grass is a darker shade of it)
+ * @param {function} [opts.avoid]      (x, y, radius) => true to keep grass off a spot
+ * @param {number} [opts.height=130]   blade height before perspective scaling
+ * @param {number} [opts.breeze=0.22]  how far the blades lean in the breeze (radians, roughly)
+ */
+export function grass(tl, surfaceAt, { count, edge, depth, perspective, random, colour, avoid = null, height = 130, breeze = 0.22, ...timing }) {
+	const tufts = [];
+
+	for (let i = 0; i < count; i++) {
+		const x = -edge + (2 * edge) * ((i + random()) / count);
+		const y = surfaceAt(x) + depth[0] + random() * (depth[1] - depth[0]);
+		if (avoid && avoid(x, y, 4)) continue;
+
+		const size = height * perspective(y);
+		const blades = [];
+		const n = 2 + Math.floor(random() * 3);
+		for (let b = 0; b < n; b++) {
+			blades.push({
+				dx: (random() - 0.5) * size * 0.5,     // spread along the ground
+				h: size * (0.6 + random() * 0.5),
+				lean: (random() - 0.5) * 0.7,           // resting lean, as a fraction of height
+				delay: random() * 0.6,                  // so they don't all sprout at once
+			});
+		}
+		tufts.push({ x, y, blades, phase: random() * 0.6 });
+	}
+
+	const ink = shade(colour, 0.4);
+
+	tl.clip((ctx, t) => {
+		ctx.strokeStyle = ink;
+		ctx.lineWidth = 1.6;
+		ctx.lineCap = 'round';
+		ctx.beginPath();
+
+		for (const tuft of tufts) {
+			// breeze at this spot: two waves travelling left to right, plus a little flutter
+			const wind = breeze * (
+				0.65 * Math.sin(t * 1.3 - tuft.x * 0.006) +
+				0.35 * Math.sin(t * 0.55 - tuft.x * 0.0025 + 1.7) +
+				0.15 * Math.sin(t * 4.1 + tuft.phase * 10)
+			);
+
+			for (const b of tuft.blades) {
+				const grow = Ease.outBack(clamp01((t - b.delay) / 0.7));
+				if (grow <= 0) continue;
+
+				const h = b.h * grow;
+				const bx = tuft.x + b.dx, by = tuft.y;
+				const tipX = bx + (b.lean + wind) * h;
+				const tipY = by - h * (1 - 0.25 * Math.abs(b.lean + wind));  // bending shortens the blade a little
+
+				// curved blade: the tip bends more than the base
+				ctx.moveTo(bx, by);
+				ctx.quadraticCurveTo(bx + (b.lean + wind) * h * 0.15, by - h * 0.6, tipX, tipY);
+			}
+		}
+
+		ctx.stroke();
+	}, { duration: 1.3, ...timing });
 }
