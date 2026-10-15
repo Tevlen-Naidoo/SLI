@@ -11,7 +11,20 @@ export const SCRIPT = [
 	"And I've wanted to say this for a while but...",
 	"I like you.\nQuite a bit",
 	"That may be quite obvious but it still needed to be said",
+	"You are funny",
+	"Pretty",
+	"Pretty funny",
+	"You're chronically online\n(Just like me!)",
+	"But most of all\nYou're WEIRD",
+	"And I like that so much!",
+	"I like your style",
+	"I like that your flavour of the tism is musicals",
+	"I like you.",
 	"So",
-	"I have an ultimatum for you\nSince that has historically worked on you :p",
+	"I have an ultimatum for you\nSince that has historically worked on you",
+	// question: true = wait here for a Yes before carrying on
+	{ text: "Will you grant me the honour of being your boyfriend?\nIn exchange, I promise to do my best to make life more fun for both of us.", question: true },
+	"I hope you know that this means...\n\nYou're never ever ever getting rid of me\n(You can try)",
+	"I like you, Lameese. Just the way you are.",
 	"You are yourself, and so remain, as I remain,\n\nYours,\n\nTev"
 ];

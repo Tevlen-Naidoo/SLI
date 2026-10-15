@@ -29,6 +29,15 @@ const stage = new Stage(document.getElementById('background'), {
 });
 
 let timeline = null;
+const question = document.getElementById('question'); // Yes / No under the big question
+let typewriter = null;   // the message, so the question's buttons know when to show
+let answeredAt = null;   // when "Yes" was pressed; kept here so it survives the scene being rebuilt on resize
+
+// The pop-up message shown every time "No" is pressed on the big question
+const NO_ALERT = "You can't say no otherwise I'll stop being your friend";
+
+// How far below the centre of the screen the Yes / No buttons sit, in scene units
+const ANSWER_GAP = 120;
 
 /* ==========================================================================
    Scene
@@ -131,7 +140,7 @@ function buildScene({ halfW, halfH }) {
 		ctx.fillRect(-halfW, -halfH, halfW * 2, halfH * 2);
 	}, { at: 0 });
 
-	message(tl, SCRIPT, { x: 0, y: 0, at: 0 });
+	typewriter = message(tl, SCRIPT, { x: 0, y: 0, at: 0, answeredAt });
 
 	return tl;
 }
@@ -141,7 +150,10 @@ function buildScene({ halfW, halfH }) {
    Run
    ========================================================================== */
 
-stage.onResize = s => { timeline = buildScene(s); };
+stage.onResize = s => {
+	timeline = buildScene(s);
+	question.style.top = `calc(50% + ${ANSWER_GAP * s.scale}px)`;
+};
 stage.onResize(stage);
 
 /* ==========================================================================
@@ -200,6 +212,35 @@ function begin() {
 
 for (const button of intro.querySelectorAll('button')) button.addEventListener('click', begin);
 
+
+/* ==========================================================================
+   The big question
+   Once it's typed, the message waits with Yes / No buttons underneath.
+   "No" only gets a pop-up (as many times as it takes); "Yes" carries on
+   with the rest of the messages. The pop-up is a <dialog> rather than
+   alert(), which would freeze the page and can interrupt the music.
+   ========================================================================== */
+
+const noPopup = document.getElementById('no-popup');
+noPopup.querySelector('p').textContent = NO_ALERT;
+noPopup.querySelector('button').addEventListener('click', () => noPopup.close());
+
+// Tapping the dimmed area outside the card closes it too
+noPopup.addEventListener('click', e => { if (e.target === noPopup) noPopup.close(); });
+
+document.getElementById('answer-no').addEventListener('click', () => noPopup.showModal());
+
+document.getElementById('answer-yes').addEventListener('click', () => {
+	if (answeredAt != null) return;
+	answeredAt = stage.time;
+	typewriter.answer(stage.time);
+});
+
+// Called every frame: buttons show only while the question is waiting
+function updateQuestion(time) {
+	question.classList.toggle('hidden', !(started && typewriter.waitingForAnswer(time)));
+}
+
 // Jump straight to a moment while working on the scene, e.g. index.html?t=8 (skips the prompt, no sound)
 const jumpTo = Number(new URLSearchParams(location.search).get('t'));
 if (jumpTo) {
@@ -215,6 +256,7 @@ stage.start({
 		drawSky(ctx);
 		if (DEBUG) stage.drawGrid();
 		if (started) timeline.draw(ctx, time);
+		updateQuestion(time);
 		if (DEBUG) stage.drawDesignArea();
 	},
 });
