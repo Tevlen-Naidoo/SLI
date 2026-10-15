@@ -13,5 +13,5 @@ export const SCRIPT = [
 	"That may be quite obvious but it still needed to be said",
 	"So",
 	"I have an ultimatum for you\nSince that has historically worked on you :p",
-
+	"You are yourself, and so remain, as I remain,\n\nYours,\n\nTev"
 ];
