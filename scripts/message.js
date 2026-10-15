@@ -1,342 +1,108 @@
-import { unipolarSineWave, noise2D } from "./utilities.js";
-import { SCRIPT } from "./script.js";
+/* ==========================================================================
+   Message
+   The typewriter: types each line of the script, holds it, backspaces it,
+   then moves on to the next. The last line stays up.
 
-const canvas = document.getElementById('background');
-const context = canvas.getContext('2d');
+   It's a timeline item like any other, drawn on the same canvas as the
+   scene, so it gets the same hand-drawn wobble from the stage.
+   Everything is worked out from the time, so restart / seek just work.
 
-let width = 0;
-let height = 0;
-let dpr = 1;
+     message(tl, SCRIPT, { x: 0, y: -350, at: 0 })
+   ========================================================================== */
 
-let elapsedTime = 0;
+import { unipolarSineWave } from './utilities.js';
 
-const textStyle = {
-	font: "50pt 'Yuyu'",
-	fillStyle: "#000000",
-	textAlign: "center",
-	textBaseline: "middle"
-};
+export class Typewriter {
+	/**
+	 * @param {string[]} lines  one entry per message; "\n" splits a message over several lines
+	 * @param {object} [opts]
+	 */
+	constructor(lines, opts = {}) {
+		this.start = 0;                                      // set by the timeline
+		this.lines = lines;
 
-document.fonts.ready.then(() => {
-	textStyle.font = "50pt 'Yuyu'";
-})
+		this.x = opts.x ?? 0;
+		this.y = opts.y ?? 0;
+		this.size = opts.size ?? 66;                         // font size in units (≈ 50pt on a 1600-wide screen)
+		this.font = opts.font ?? "'Yuyu'";
+		this.color = opts.color ?? '#000000';
+		this.lineHeight = opts.lineHeight ?? 1.25;           // multiple of size
 
-// const SCRIPT = [
-// 	"Hello, World",
-// 	"I hope you're doing well"
-// ];
+		this.typingSpeed = opts.typingSpeed ?? 10;           // characters per second
+		this.backspaceSpeed = opts.backspaceSpeed ?? 10;
+		this.displayDuration = opts.displayDuration ?? 2;    // seconds a finished line is held
+		this.transitionDuration = opts.transitionDuration ?? 0.5; // seconds of blank between lines
 
-function caret(x, y) {
-	context.save();
-
-	const caretHeight = 62.5;
-	const caretWidth = 3;
-
-	context.fillStyle = `rgba(0, 0, 0, ${unipolarSineWave(4 * elapsedTime)})`;
-	context.fillRect(x, y - caretHeight / 2, caretWidth, caretHeight);
-
-	context.restore();
-}
-
-let currentMessageIndex = 0;
-let characterShown = 0;
-
-let typingSpeed = 10;
-let backspaceSpeed = 10;
-
-let displayDuration = 2;
-let transitionDuration = 0.5;
-
-let phase = "typing";
-let characterTimer = 0;
-let pauseTimer = 0;
-
-const wiggle = {
-	frameCount: 4,         // number of distinct wobble patterns to cycle through
-	boilRate: 6,           // pattern changes per second
-	frequency: 0.15,       // noise cells per CSS pixel: higher = smaller, tighter wobbles
-	amplitude: 0.6,        // max displacement in CSS pixels
-	supersample: 3         // sub-samples per pixel along each axis: higher = smoother edges, slower
-};
-
-// Off-screen canvases: one holds the crisp text, the other receives the warped result
-const sourceCanvas = document.createElement('canvas');
-const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true });
-
-const wiggleCanvas = document.createElement('canvas');
-const wiggleContext = wiggleCanvas.getContext('2d');
-
-let wiggleCacheKey = "";
-let wiggleBox = { width: 0, height: 0 };
-
-function parseColor(color) {
-	sourceCanvas.width = sourceCanvas.height = 1;
-	sourceContext.fillStyle = color;
-	sourceContext.fillRect(0, 0, 1, 1);
-
-	const [r, g, b] = sourceContext.getImageData(0, 0, 1, 1).data;
-	return { r, g, b };
-}
-
-function sampleAlpha(data, w, h, x, y) {
-	if (x < 0 || y < 0 || x > w - 1 || y > h - 1) return 0;
-
-	const x0 = Math.floor(x);
-	const y0 = Math.floor(y);
-	const x1 = Math.min(x0 + 1, w - 1);
-	const y1 = Math.min(y0 + 1, h - 1);
-
-	const tx = x - x0;
-	const ty = y - y0;
-
-	const a = data[(y0 * w + x0) * 4 + 3];
-	const b = data[(y0 * w + x1) * 4 + 3];
-	const c = data[(y1 * w + x0) * 4 + 3];
-	const d = data[(y1 * w + x1) * 4 + 3];
-
-	const top = a + (b - a) * tx;
-	const bottom = c + (d - c) * tx;
-
-	return top + (bottom - top) * ty;
-}
-
-function renderWiggleText(message, seed) {
-	const metrics = context.measureText(message);
-
-	const padding = Math.ceil(wiggle.amplitude * 2);
-	const halfWidth = Math.ceil(Math.max(metrics.actualBoundingBoxLeft, metrics.actualBoundingBoxRight, metrics.width / 2)) + padding;
-	const halfHeight = Math.ceil(Math.max(metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent)) + padding;
-
-	const cssWidth = halfWidth * 2;
-	const cssHeight = halfHeight * 2;
-
-	const w = Math.ceil(cssWidth * dpr);
-	const h = Math.ceil(cssHeight * dpr);
-
-	const ss = wiggle.supersample;
-	const sw = w * ss;
-	const sh = h * ss;
-
-	const color = parseColor(textStyle.fillStyle);
-
-	sourceCanvas.width = sw;
-	sourceCanvas.height = sh;
-	wiggleCanvas.width = w;
-	wiggleCanvas.height = h;
-
-	sourceContext.setTransform(dpr * ss, 0, 0, dpr * ss, 0, 0);
-	sourceContext.font = textStyle.font;
-	sourceContext.fillStyle = textStyle.fillStyle;
-	sourceContext.textAlign = "center";
-	sourceContext.textBaseline = "middle";
-	sourceContext.fillText(message, halfWidth, halfHeight);
-
-	const src = sourceContext.getImageData(0, 0, sw, sh).data;
-	const output = wiggleContext.createImageData(w, h);
-	const dst = output.data;
-
-	const frequency = wiggle.frequency / dpr;
-	const amplitude = wiggle.amplitude * dpr;
-	const sampleCount = ss * ss;
-
-	for (let y = 0; y < h; y++) {
-		const ny = y * frequency;
-
-		for (let x = 0; x < w; x++) {
-			const nx = x * frequency;
-
-			const dx = noise2D(nx, ny, seed) * amplitude;
-			const dy = noise2D(nx, ny, seed + 101) * amplitude;
-
-			const baseX = (x + dx) * ss;
-			const baseY = (y + dy) * ss;
-
-			const last = ss - 1;
-			const c0 = sampleAlpha(src, sw, sh, baseX, baseY);
-			const c1 = sampleAlpha(src, sw, sh, baseX + last, baseY);
-			const c2 = sampleAlpha(src, sw, sh, baseX, baseY + last);
-			const c3 = sampleAlpha(src, sw, sh, baseX + last, baseY + last);
-
-			let alpha;
-			if (c0 === c1 && c0 === c2 && c0 === c3 && (c0 === 0 || c0 === 255)) {
-				alpha = c0;
-			}
-			else {
-				let sum = 0;
-				for (let j = 0; j < ss; j++) {
-					for (let i = 0; i < ss; i++) {
-						sum += sampleAlpha(src, sw, sh, baseX + i, baseY + j);
-					}
-				}
-				alpha = sum / sampleCount;
-			}
-
-			if (alpha === 0) continue;
-
-			const index = (y * w + x) * 4;
-			dst[index] = color.r;
-			dst[index + 1] = color.g;
-			dst[index + 2] = color.b;
-			dst[index + 3] = alpha;
+		// When each message starts typing; the last one is held for good
+		this.schedule = [];
+		let t = 0;
+		for (const [i, text] of lines.entries()) {
+			const typed = t + text.length / this.typingSpeed;
+			const held = typed + this.displayDuration;
+			const deleted = held + text.length / this.backspaceSpeed;
+			this.schedule.push({ text, start: t, typed, held, deleted });
+			if (i < lines.length - 1) t = deleted + this.transitionDuration;
 		}
+
+		const last = this.schedule[this.schedule.length - 1];
+		this.duration = last ? last.held : 0;
 	}
 
-	wiggleContext.putImageData(output, 0, 0);
-	wiggleBox = { width: cssWidth, height: cssHeight };
-}
-
-function drawWiggleText(message, x, y) {
-	if (!message) return;
-
-	const seed = Math.floor(elapsedTime * wiggle.boilRate) % wiggle.frameCount;
-	const key = `${message}|${seed}|${dpr}|${textStyle.font}`;
-
-	if (key !== wiggleCacheKey) {
-		wiggleCacheKey = key;
-		renderWiggleText(message, seed);
+	get end() {
+		return this.start + this.duration;
 	}
 
-	context.drawImage(wiggleCanvas, x - wiggleBox.width / 2, y - wiggleBox.height / 2, wiggleBox.width, wiggleBox.height);
-}
-
-function showMessage() {
-	const message = SCRIPT[currentMessageIndex];
-	const visibleText = message.substring(0, characterShown);
-
-	const totalWidth = context.measureText(visibleText).width;
-
-	drawWiggleText(visibleText, width / 2, height / 2);
-
-	caret(width / 2 + totalWidth / 2 + 10, height / 2);
-}
-
-
-function resizeCanvas() {
-	dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-	width = window.innerWidth;
-	height = window.innerHeight;
-
-	canvas.width = Math.round(width * dpr);
-	canvas.height = Math.round(height * dpr);
-
-	context.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-
-function init() {
-	resizeCanvas();
-}
-
-function update(deltaTime) {
-	elapsedTime += deltaTime;
-
-	const message = SCRIPT[currentMessageIndex];
-
-	switch (phase) {
-		case "typing": {
-			characterTimer += deltaTime * typingSpeed;
-
-			while (characterTimer >= 1) {
-				characterShown++;
-				characterTimer--;
-
-			}
-
-			if (characterShown >= message.length) {
-				characterShown = message.length;
-				phase = "pause";
-				pauseTimer = 0;
-				characterTimer = 0;
-			}
-
-			break;
-
+	// Which message is up at local time t, and how many of its characters are showing
+	_state(t) {
+		let entry = this.schedule[0];
+		for (const e of this.schedule) {
+			if (t >= e.start) entry = e;
 		}
 
-		case "pause": {
-			pauseTimer += deltaTime;
+		const isLast = entry === this.schedule[this.schedule.length - 1];
+		let shown;
+		if (t < entry.typed) shown = Math.floor((t - entry.start) * this.typingSpeed);
+		else if (t < entry.held || isLast) shown = entry.text.length;
+		else shown = entry.text.length - Math.floor((t - entry.held) * this.backspaceSpeed);
 
-			if (pauseTimer >= displayDuration) {
-				if (currentMessageIndex == SCRIPT.length - 1) {
-					phase = "done";
-
-				}
-				else {
-					phase = "deleting";
-					characterTimer = 0;
-				}
-			}
-
-			break;
-		}
-
-		case "deleting": {
-			characterTimer += deltaTime * backspaceSpeed;
-
-			while (characterTimer >= 1) {
-				characterShown--;
-				characterTimer--;
-			}
-
-			if (characterShown <= 0) {
-				characterShown = 0;
-				phase = "transition";
-				pauseTimer = 0;
-			}
-
-			break;
-		}
-
-		case "transition": {
-			pauseTimer += deltaTime;
-
-			if (pauseTimer >= transitionDuration) {
-				currentMessageIndex++;
-				phase = "typing";
-				characterTimer = 0;
-				pauseTimer = 0;
-			}
-		}
-
-		case "done": {
-			break;
-		}
+		return { text: entry.text, shown: Math.max(0, Math.min(entry.text.length, shown)) };
 	}
 
+	draw(ctx, time) {
+		if (time < this.start || !this.schedule.length) return;
+		const t = time - this.start;
 
+		const { text, shown } = this._state(t);
+		const rows = text.substring(0, shown).split('\n');
+		const step = this.size * this.lineHeight;
+		const top = this.y - ((rows.length - 1) * step) / 2;
+
+		ctx.save();
+		ctx.font = `${this.size}px ${this.font}`;
+		ctx.fillStyle = this.color;
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+
+		for (const [i, row] of rows.entries()) {
+			ctx.fillText(row, this.x, top + i * step);
+		}
+
+		// Blinking caret after the last row
+		const lastRow = rows[rows.length - 1];
+		const caretX = this.x + ctx.measureText(lastRow).width / 2 + this.size * 0.15;
+		const caretY = top + (rows.length - 1) * step;
+		const caretHeight = this.size * 0.95;
+
+		ctx.globalAlpha *= unipolarSineWave(4 * t);
+		ctx.fillRect(caretX, caretY - caretHeight / 2, this.size * 0.045, caretHeight);
+		ctx.restore();
+	}
 }
 
-
-function draw() {
-	// Clear the entire rectangle
-	context.clearRect(0, 0, width, height);
-
-	context.font = textStyle.font;
-	context.fillStyle = textStyle.fillStyle;
-	context.textAlign = textStyle.textAlign;
-	context.textBaseline = textStyle.textBaseline;
-
-	showMessage();
-
+/**
+ * Adds the typewriter to a timeline. Takes the usual scheduling options
+ * (at, delay) as well as the Typewriter options.
+ */
+export function message(tl, lines, opts = {}) {
+	return tl.place(new Typewriter(lines, opts), opts);
 }
-
-// Main animation loop
-let lastTime = 0;
-
-function animate(timestamp) {
-	// Delta time in seconds; clamp large jumps after tab inactivity
-	const deltaTime = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.05) : 0;
-
-	lastTime = timestamp;
-
-	update(deltaTime);
-	draw();
-
-	requestAnimationFrame(animate);
-}
-
-
-window.addEventListener('resize', resizeCanvas);
-
-init();
-requestAnimationFrame(animate);

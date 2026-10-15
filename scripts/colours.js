@@ -47,3 +47,18 @@ export const PISTACHIO = {
 	hex: "b1cfb7",
 	rgb: "rgb(177, 207, 183)"
 };
+
+/* Helpers: the palette as canvas colour strings */
+
+// Palette colour with transparency, e.g. rgba(PISTACHIO, 0.4)
+export function rgba(colour, alpha) {
+	const n = parseInt(colour.hex, 16);
+	return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+// Darker version of a palette colour for outlines: amount 0 = same, 1 = black
+export function shade(colour, amount) {
+	const n = parseInt(colour.hex, 16);
+	const k = 1 - amount;
+	return `rgb(${Math.round((n >> 16) * k)}, ${Math.round(((n >> 8) & 255) * k)}, ${Math.round((n & 255) * k)})`;
+}

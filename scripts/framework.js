@@ -1,7 +1,8 @@
 /* ==========================================================================
    Line-drawing animation framework
    --------------------------------------------------------------------------
-   Stage     - canvas, resizing, centred coordinates, design area, main loop
+   Stage     - canvas, resizing, centred coordinates, design area, main loop,
+               optional hand-drawn wobble over the whole frame (wobble.js)
    DrawPath  - geometry that can be drawn partially (0..1 of its length)
    Timeline  - schedules items: strokes, layers and clips
    Stroke    - a path being drawn, with timing and style
@@ -17,6 +18,9 @@
    stage.halfW / stage.halfH give the visible edges. Anything that must
    reach the screen edges should use them.
    ========================================================================== */
+
+
+import { Wobble } from './wobble.js';
 
 
 /* ==========================================================================
@@ -93,10 +97,17 @@ export class Stage {
 	 * @param {number} [opts.designWidth=1600]  units across the design area
 	 * @param {number} [opts.designHeight=900]  units down the design area
 	 * @param {number} [opts.maxDpr=2]          cap on device pixel ratio
+	 * @param {object|false} [opts.wobble]      wobble settings (see Wobble), or false to turn it off
+	 *
+	 * With wobble on, everything is drawn to an off-screen canvas (stage.canvas)
+	 * and the wobbled result is shown on the canvas passed in (stage.view).
+	 * Without WebGL2 it quietly falls back to drawing straight onto the view.
 	 */
 	constructor(canvas, opts = {}) {
-		this.canvas = canvas;
-		this.ctx = canvas.getContext('2d');
+		this.view = canvas;
+		this.wobble = opts.wobble === false ? null : Wobble.create(canvas, opts.wobble);
+		this.canvas = this.wobble ? document.createElement('canvas') : canvas;
+		this.ctx = this.canvas.getContext('2d');
 
 		this.designWidth = opts.designWidth ?? 1600;
 		this.designHeight = opts.designHeight ?? 900;
@@ -110,6 +121,7 @@ export class Stage {
 		this.halfH = 0;
 
 		this.time = 0;      // seconds of animation time
+		this.clock = 0;     // real seconds, keeps running while paused (drives the wobble)
 		this.speed = 1;     // playback speed multiplier
 		this.paused = false;
 		this.onResize = null;
@@ -129,6 +141,7 @@ export class Stage {
 
 		this.canvas.width = Math.round(this.width * this.dpr);
 		this.canvas.height = Math.round(this.height * this.dpr);
+		if (this.wobble) this.wobble.resize(this.canvas.width, this.canvas.height);
 
 		this.scale = Math.min(this.width / this.designWidth, this.height / this.designHeight);
 		this.halfW = this.width / 2 / this.scale;
@@ -242,6 +255,7 @@ export class Stage {
 				? Math.min((timestamp - this._lastTimestamp) / 1000, 0.05)
 				: 0;
 			this._lastTimestamp = timestamp;
+			this.clock += raw;
 
 			const dt = this.paused ? 0 : raw * this.speed;
 			this.time += dt;
@@ -250,6 +264,7 @@ export class Stage {
 
 			this.beginFrame();
 			if (draw) draw(this.ctx, this.time);
+			if (this.wobble) this.wobble.render(this.canvas, this.clock, this.dpr);
 
 			requestAnimationFrame(frame);
 		};
