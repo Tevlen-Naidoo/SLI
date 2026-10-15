@@ -13,7 +13,7 @@ const MUTE = { centre: 0.55, edges: 0.3, fadeIn: 3 }; // fadeIn: seconds to ease
 
 // How slowly the scene is drawn: 1 = the timings written in buildScene, 2.5 = two and a half times as long.
 // The message types at its own speed; the grass breeze and the sun's spin keep their natural pace.
-const SLOW = 2.5;
+const SLOW = 4;
 
 // Song volume once it has faded in (0..1), and how long the fade takes
 const SONG_VOLUME = 0.05;
