@@ -543,6 +543,7 @@ export class Stroke {
    A group with its own timeline. Its children's times are relative to the
    layer's start. x, y, rotation, scale and opacity can be numbers or
    functions of the layer's local time in seconds. flipX mirrors it.
+   speed slows down (< 1) or speeds up (> 1) everything inside it.
    ========================================================================== */
 
 export class Layer {
@@ -556,6 +557,7 @@ export class Layer {
 		this.rotation = opts.rotation ?? 0;  // radians
 		this.scale = opts.scale ?? 1;
 		this.flipX = opts.flipX ?? false;    // true = mirrored left to right
+		this.speed = opts.speed ?? 1;        // playback speed of everything inside: 0.5 = half speed
 		this.opacity = opts.opacity ?? 1;
 
 		this.fadeIn = opts.fadeIn ?? 0;
@@ -569,7 +571,7 @@ export class Layer {
 
 	draw(ctx, time) {
 		if (time < this.start) return;
-		const t = time - this.start;
+		const t = (time - this.start) * this.speed;
 
 		const alpha = fadeAlpha(t, this.fadeIn, this.fadeOutAt, this.fadeOut) * valueAt(this.opacity, t);
 		if (alpha <= 0) return;
@@ -689,7 +691,7 @@ export class Timeline {
 	layer(opts, build) {
 		const layer = new Layer(opts);
 		if (build) build(layer.timeline, layer);
-		layer.duration = opts.duration ?? Math.max(layer.timeline.duration, layer.fadeIn);
+		layer.duration = opts.duration ?? Math.max(layer.timeline.duration, layer.fadeIn) / layer.speed;
 		this.place(layer, opts);
 		return this;
 	}

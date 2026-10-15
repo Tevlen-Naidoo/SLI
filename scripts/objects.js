@@ -784,12 +784,16 @@ export function grass(tl, surfaceAt, { count, edge, depth, perspective, random, 
 		ctx.lineCap = 'round';
 		ctx.beginPath();
 
+		// The breeze runs on the real clock, so it keeps a natural pace even
+		// when the scene around it is slowed down
+		const now = performance.now() / 1000;
+
 		for (const tuft of tufts) {
 			// breeze at this spot: two waves travelling left to right, plus a little flutter
 			const wind = breeze * (
-				0.65 * Math.sin(t * 1.3 - tuft.x * 0.006) +
-				0.35 * Math.sin(t * 0.55 - tuft.x * 0.0025 + 1.7) +
-				0.15 * Math.sin(t * 4.1 + tuft.phase * 10)
+				0.65 * Math.sin(now * 1.3 - tuft.x * 0.006) +
+				0.35 * Math.sin(now * 0.55 - tuft.x * 0.0025 + 1.7) +
+				0.15 * Math.sin(now * 4.1 + tuft.phase * 10)
 			);
 
 			for (const b of tuft.blades) {

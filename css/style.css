@@ -17,3 +17,59 @@ body {
 	height: 100vh;
 	display: block;
 }
+
+/* "Ready?" prompt, shown over the sky until it's answered */
+#intro {
+	position: fixed;
+	inset: 0;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1.5rem;
+	padding: 16px;
+	font-family: 'Yuyu', cursive;
+	color: #3a2a33;
+	transition: opacity 0.8s ease, visibility 0.8s;
+}
+
+#intro.hidden {
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+}
+
+#intro p {
+	font-size: clamp(3rem, 10vw, 5.5rem);
+}
+
+#intro .choices {
+	display: flex;
+	gap: 1.25rem;
+}
+
+#intro button {
+	font: inherit;
+	font-size: clamp(1.4rem, 4.5vw, 2rem);
+	color: inherit;
+	min-width: 6.5rem;
+	padding: 0.35rem 1.6rem;
+	background: rgba(255, 255, 255, 0.7);
+	border: 2.5px solid #3a2a33;
+	/* slightly uneven corners, to look hand-drawn */
+	border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+	cursor: pointer;
+	transition: transform 0.15s ease, background 0.15s ease;
+}
+
+#intro button:hover,
+#intro button:focus-visible {
+	background: #fff;
+	transform: rotate(-2deg) scale(1.05);
+	outline: none;
+}
+
+#intro button:active {
+	transform: scale(0.96);
+}
